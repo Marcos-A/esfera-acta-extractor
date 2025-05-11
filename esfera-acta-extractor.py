@@ -170,7 +170,7 @@ def extract_records(
     for _, row in melted.iterrows():
         for code, grade in entry_pattern.findall(row['entry']):
             rows.append({
-                'student': row[name_col],
+                'estudiant': row[name_col],
                 'ra_code': code,
                 'grade': grade
             })
@@ -179,17 +179,22 @@ def extract_records(
     return df
 
 
-def sort_and_save(df: pd.DataFrame, output_path: str) -> None:
+def sort_records(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean names, sort, and save to semicolon-delimited CSV.
     """
-    df['student'] = df['student'].str.replace(r"\s*\n\s*", ' ', regex=True).str.strip()
+    df['estudiant'] = df['estudiant'].str.replace(r"\s*\n\s*", ' ', regex=True).str.strip()
     df = df.sort_values(
-        by=['student', 'ra_code'],
+        by=['estudiant', 'ra_code'],
         key=lambda c: c.str.lower()
     ).reset_index(drop=True)
+    return df
+
+
+def export_csv(df: pd.DataFrame, output_path: str) -> None:
+    """Save DataFrame to CSV with semicolon delimiter."""
     df.to_csv(output_path, sep=';', encoding='utf-8', index=False)
-    print(f"✅ Extracted {len(df)} entries to {output_path}")
+    print(f"\t- Extracted {len(df)} entries to {output_path}")
 
 
 def main(pdf_path: str, output_csv: str) -> None:
@@ -224,13 +229,20 @@ def main(pdf_path: str, output_csv: str) -> None:
         _                       
         \d(?:\s*\d)RA)                          # RA
         \s\(\d\)\s*-\s*                         # round (convocatòria)
-        (?P<grade>A\d{1,2}|PDT|EP)              # grade options: A#, PDT, EP
+        (?P<grade>A\d{1,2}|PDT|EP|NA)           # grade options: A#, PDT, EP, NA
         """,
         flags=re.IGNORECASE | re.VERBOSE
     )
     records = extract_records(melted, name_col, entry_pattern)
-    # 10) Sort and save
-    sort_and_save(records, output_csv)
+    # 10) Sort records by student and RA code
+    records = sort_records(records)
+    export_csv(records, 'preliminary_records.csv')
+    # 11) Pivot to wide format: students × RA codes
+    wide = records.pivot(index='estudiant', columns='ra_code', values='grade')
+    wide = wide.fillna('')            # optional: blank instead of NaN
+    wide = wide.reset_index()         # make 'estudiant' a column again
+    # 12) Export to CSV
+    export_csv(wide, output_csv)
 
 
 if __name__ == '__main__':
