@@ -20,5 +20,9 @@ RUN pip install --no-cache-dir \
       pandas \
       pdfplumber
 
+# Optional: install tabulate for pretty-printing DataFrames during development
+#   (uncomment the next line if you want to use tabulate; comment it out in production)
+RUN pip install --no-cache-dir tabulate
+
 # Drop into a shell by default
 CMD ["bash"]

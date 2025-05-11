@@ -3,15 +3,18 @@ import pdfplumber
 import pandas as pd
 import numpy as np
 
-def debug_print(df, output_file):
-    # Assign a path for the text file
-    txt_path = output_file + '.txt'
-    # Write each DataFrame to the text file
-    with open(txt_path, 'w', encoding='utf-8') as f:
-        f.write("Forward-filled DataFrame:\n")
-        # to_string() gives a nicely formatted plain-text table
-        f.write(df.to_string(index=False))
-        f.write('\n')
+def debug_print(df, output_file, export_txt=True, print_df=False):
+    if export_txt:
+        # Assign a path for the text file
+        txt_path = output_file + '.txt'
+        # Write each DataFrame to the text file
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write("Forward-filled DataFrame:\n")
+            # to_string() gives a nicely formatted plain-text table
+            f.write(df.to_string(index=False))
+            f.write('\n')
+    if print_df:
+        print(df.to_markdown(index=True))
 
 
 def extract_tables(pdf_path, table_opts=None):
@@ -42,6 +45,7 @@ def extract_tables(pdf_path, table_opts=None):
             # to_string() gives a nicely formatted plain-text table
             f.write(df.to_string(index=False))
             f.write('\n\n')
+    # debug_print(dfs[0], 'extract_tables-1', export_txt=False, print_df=True)
     return dfs
 
 def normalize_headers(df):
@@ -93,6 +97,16 @@ def forward_fill_names(df, name_keyword):
     )
     debug_print(df, 'forward_fill_names')
     return df, name_col
+
+
+def join_nonempty(col):
+    # col is a Series for one student; drop blanks, strip, then join with newline
+    vals = [
+        str(v).strip() for v in col.dropna().astype(str)
+        if str(v).strip()
+    ]
+    return "\n".join(vals)
+
 
 
 def select_melt_code_conv_grades(df, name_col, code_pattern):
@@ -194,24 +208,35 @@ def main(pdf_path, output_csv):
 
     # 2. Concatenate all DataFrames
     big_df = pd.concat(raw_tables, ignore_index=True)
+    # debug_print(big_df, 'big_df', export_txt=False, print_df=True)
 
     # 3. Normalize headers
     norm_df = normalize_headers(big_df)
-    debug_print(norm_df, 'normalize_headers')
+    # debug_print(norm_df, 'normalize_headers', export_txt=False, print_df=True)
 
     # 4. Drop irrelevant columns
     irrelevant_columns = ['MC','H', 'Pas de curs', 'MH']
     relevant_df = drop_irrelevant_columns(norm_df, irrelevant_columns)
+    # debug_print(relevant_df, 'relevant_columns', export_txt=False, print_df=True)
 
     # 7) Remove stray MC/H marks like "  66\n" or "   250\n"
-    relevant_df = remove_stray_marks(relevant_df)
+    # relevant_df = remove_stray_marks(relevant_df)
 
     # 5. Forward-fill student names
     df_filled, name_col = forward_fill_names(relevant_df, 'nom i cognoms')
+    # debug_print(df_filled, 'forward_fill_names', export_txt=False, print_df=True)
 
+    # Merge any split‐across‐page rows
+    df_merged = (
+        df_filled
+        .set_index(name_col)                           # index by student
+        .groupby(level=0, sort=False)                  # group each student’s rows
+        .agg(join_nonempty)                            # join each column’s bits
+        .reset_index()                                 # bring name_col back as column
+    )
     # 6. Melt only the Codi (Conv) - Qual columns
     code_pattern = re.compile(r'^Codi \(Conv\) - Qual$', re.IGNORECASE)
-    melted = select_melt_code_conv_grades(df_filled, name_col, code_pattern)
+    melted = select_melt_code_conv_grades(df_merged, name_col, code_pattern)
 
     # 7. Clean up the entries
     melted['entry'] = clean_entries(melted['entry'])
@@ -246,7 +271,7 @@ def main(pdf_path, output_csv):
         _\d(?:\s*\d)RA             # allow space between the two RA digits
         )
         \s\(\d\)\s*-\s*
-        (?P<grade>A\d{1,2}|PDT)
+        (?P<grade>A\d{1,2}|PDT|EP)
     """, flags=re.VERBOSE|re.IGNORECASE)
     result = extract_records(melted, name_col, entry_pattern)
     # Collapse any stray spaces out of the code
