@@ -13,4 +13,8 @@ docker run --rm -it \
   grade-extractor
 ```
 
-Inside the container you’ll find your PDF in `/data`.
+Inside the container you’ll find your PDF in `/data`. Run the script with:
+
+```bash
+python esfera-acta-extractor.py
+```
