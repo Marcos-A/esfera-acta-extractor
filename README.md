@@ -22,9 +22,9 @@ A Python tool to extract and process grade records from Esfer@'s PDF grade repor
 
 ```
 .
-├── Dockerfile              # Docker configuration
-├── README.md              # This file
-├── requirements.txt       # Python dependencies
+├── Dockerfile                # Docker configuration
+├── README.md                 # This file
+├── requirements.txt          # Python dependencies
 └── esfera-acta-extractor.py  # Main script
 ```
 
