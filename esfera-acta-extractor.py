@@ -43,6 +43,26 @@ def debug_print(
         print(df.to_markdown(index=False))
 
 
+def extract_group_code(pdf_path: str) -> str:
+    """
+    Extract the group code that appears under 'Codi del grup' in the first page.
+    Returns the code with underscores instead of spaces.
+    """
+    with pdfplumber.open(pdf_path) as pdf:
+        first_page = pdf.pages[0]
+        text = first_page.extract_text()
+        
+        # Find the line after "Codi del grup"
+        lines = text.split('\n')
+        for i, line in enumerate(lines):
+            if 'Codi del grup' in line and i + 1 < len(lines):
+                # Extract the code from the next line and replace spaces with underscores
+                group_code = lines[i + 1].strip()
+                return group_code.replace(' ', '_')
+    
+    return 'unknown_group'  # Fallback if code not found
+
+
 def extract_tables(pdf_path: str, table_opts: dict = None) -> list[pd.DataFrame]:
     """
     Extract all tables from a PDF, one DataFrame per table found.
@@ -308,30 +328,33 @@ def export_excel_with_spacing(
     print(f"\t- Exported {len(export_df)} entries to {output_path}")
 
 
-def main(pdf_path: str, output_csv: str) -> None:
-    # 1) Extract tables
+def main(pdf_path: str) -> None:
+    # 1) Extract group code for filename
+    group_code = extract_group_code(pdf_path)
+    output_xlsx = f'{group_code}.xlsx'
+    # 2) Extract tables
     tables = extract_tables(pdf_path)
-    # 2) Combine
+    # 3) Combine
     combined = pd.concat(tables, ignore_index=True)
-    # 3) Normalize headers
+    # 4) Normalize headers
     combined = normalize_headers(combined)
-    # 4) Drop irrelevant
+    # 5) Drop irrelevant
     combined = drop_irrelevant_columns(combined, ['MC', 'H', 'Pas de curs', 'MH'])
-    # 5) Forward-fill names
+    # 6) Forward-fill names
     filled, name_col = forward_fill_names(combined, 'nom i cognoms')
-    # 6) Merge split rows
+    # 7) Merge split rows
     merged = (
         filled.set_index(name_col)
               .groupby(level=0, sort=False)
               .agg(join_nonempty)
               .reset_index()
     )
-    # 7) Melt only Codi (Conv) - Qual columns (include optional .n suffix):
+    # 8) Melt only Codi (Conv) - Qual columns (include optional .n suffix):
     code_pattern = re.compile(r'^Codi \(Conv\) - Qual(?:\.\d+)?$', re.IGNORECASE)
     melted = select_melt_code_conv_grades(merged, name_col, code_pattern)
-    # 8) Clean entry text
+    # 9) Clean entry text
     melted['entry'] = clean_entries(melted['entry'])
-    # 9) Extract RA records using original entry_pattern
+    # 10) Extract RA records using original entry_pattern
     ra_entry_pattern = re.compile(
         r"""
         (?P<code>[A-Za-z0-9]{4,}                # MP code format
@@ -345,22 +368,20 @@ def main(pdf_path: str, output_csv: str) -> None:
         flags=re.IGNORECASE | re.VERBOSE
     )
     records = extract_ra_records(melted, name_col, ra_entry_pattern)
-    # 10) Get unique MP codes and identify those with EM entries (qualificació de pràctiques en empresa)
+    # 11) Get unique MP codes and identify those with EM entries (qualificació de pràctiques en empresa)
     mp_codes = extract_mp_codes(records)
     mp_codes_with_em = find_mp_codes_with_em(melted, mp_codes)
-    # 11) Sort records by student and RA code
+    # 12) Sort records by student and RA code
     records = sort_records(records)
-    # 12) Pivot to wide format: students × RA codes
+    # 13) Pivot to wide format: students × RA codes
     wide = records.pivot(index='estudiant', columns='ra_code', values='grade')
     wide = wide.fillna('')                      # optional: blank instead of NaN
     wide = wide.reset_index()                   # make 'estudiant' a column again
-    
-    # 13) Export to Excel with proper spacing between MP groups
-    export_excel_with_spacing(wide, output_csv, mp_codes_with_em, mp_codes)
+    # 14) Export to Excel with proper spacing between MP groups
+    export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes)
 
 
 if __name__ == '__main__':
     # Example usage
     PDF_FILE = 'ActaAvaluacioFlexible_Gestió Administrativa_1_1 GA-A ( CFPM AG10 )_2_263702.pdf'
-    OUTPUT_CSV = 'report_ra_marks.xlsx'  # Changed extension to .xlsx
-    main(PDF_FILE, OUTPUT_CSV)
+    main(PDF_FILE)

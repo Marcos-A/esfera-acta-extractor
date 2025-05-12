@@ -52,3 +52,6 @@ discarded_tests/
 *.pdf
 *.txt
 *.xlsx
+
+# But keep requirements.txt
+!requirements.txt
