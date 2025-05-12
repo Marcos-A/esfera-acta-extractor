@@ -158,13 +158,13 @@ def clean_entries(series: pd.Series) -> pd.Series:
     )
 
 
-def extract_records(
+def extract_ra_records(
     melted: pd.DataFrame,
     name_col: str,
     entry_pattern: re.Pattern
 ) -> pd.DataFrame:
     """
-    Extract code & grade pairs from each entry via regex.
+    Extract RA code & grade pairs from each entry via regex.
     """
     rows = []
     for _, row in melted.iterrows():
@@ -179,9 +179,59 @@ def extract_records(
     return df
 
 
+def extract_mp_codes(records: pd.DataFrame) -> list[str]:
+    """
+    Extract unique MP codes from RA codes.
+    """
+    mp_pattern = re.compile(r'^([A-Za-z0-9]+)_')
+    mp_codes = records['ra_code'].str.extract(mp_pattern, expand=False)
+    return sorted(mp_codes.unique().tolist())
+
+
+def find_mp_codes_with_em(melted: pd.DataFrame, mp_codes: list[str]) -> list[str]:
+    """
+    Find which MP codes have associated EM entries
+    (stops searching once all MP codes have been checked).
+    """
+    em_entry_pattern = re.compile(
+        r"""
+        (?P<code>[A-Za-z0-9]{4,}                # MP code format
+        _               
+        [A-Za-z0-9]{4,5}                        # CF code format
+        _                       
+        \d(?:\s*\d)EM)                          # EM
+        \s\(\d\)                                # round (convocatòria)
+        """,
+        flags=re.IGNORECASE | re.VERBOSE
+    )
+    
+    mp_with_em = set()
+    mp_pattern = re.compile(r'^([A-Za-z0-9]+)_')
+    
+    # Process entries until we've found all possible MPs with EM
+    for entry in melted['entry']:
+        # Check if entry contains any EM pattern
+        if 'EM' not in str(entry):
+            continue
+            
+        # Extract MP codes from EM entries
+        for code in em_entry_pattern.findall(str(entry)):
+            mp_match = mp_pattern.match(code)
+            if mp_match:
+                mp_code = mp_match.group(1)
+                if mp_code in mp_codes:
+                    mp_with_em.add(mp_code)
+                    
+        # If we've found EM entries for all MP codes, we can stop
+        if len(mp_with_em) == len(mp_codes):
+            break
+            
+    return sorted(list(mp_with_em))
+
+
 def sort_records(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Clean names, sort, and save to semicolon-delimited CSV.
+    Clean names, sort and save to semicolon-delimited CSV.
     """
     df['estudiant'] = df['estudiant'].str.replace(r"\s*\n\s*", ' ', regex=True).str.strip()
     df = df.sort_values(
@@ -192,9 +242,70 @@ def sort_records(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def export_csv(df: pd.DataFrame, output_path: str) -> None:
-    """Save DataFrame to CSV with semicolon delimiter."""
+    """
+    Save DataFrame to CSV with semicolon delimiter.
+    """
     df.to_csv(output_path, sep=';', encoding='utf-8', index=False)
     print(f"\t- Extracted {len(df)} entries to {output_path}")
+
+
+def export_excel_with_spacing(
+    df: pd.DataFrame,
+    output_path: str,
+    mp_codes_with_em: list[str],
+    mp_codes: list[str]
+) -> None:
+    """
+    Export DataFrame to Excel with specific column spacing after each MP's RAs.
+    - 3 empty columns after MPs with EM (named: MP CENTRE, MP EMPRESA, MP)
+    - 1 empty column after other MPs (named: MP)
+    Uses pre-computed mp_codes list for efficient grouping.
+    """
+    # Get the current column order (excluding 'estudiant')
+    ra_codes = [col for col in df.columns if col != 'estudiant']
+    
+    # Group RA codes by their MP using existing mp_codes
+    mp_groups = {mp: [] for mp in mp_codes}  # Initialize with known MPs
+    for ra_code in ra_codes:
+        # Find which MP this RA belongs to
+        mp_code = next(mp for mp in mp_codes if ra_code.startswith(mp + '_'))
+        mp_groups[mp_code].append(ra_code)
+    
+    # Create new column order with spacing
+    new_columns = ['estudiant']
+    for mp_code in mp_codes:  # Use mp_codes to maintain consistent order
+        # Add all RA codes for this MP
+        new_columns.extend(mp_groups[mp_code])
+        # Add empty columns with specific names based on whether MP has EM
+        if mp_code in mp_codes_with_em:
+            new_columns.extend([
+                f'{mp_code} CENTRE',
+                f'{mp_code} EMPRESA',
+                f'{mp_code}'
+            ])
+        else:
+            new_columns.append(f'{mp_code}')
+    
+    # Create new DataFrame with the desired column order
+    export_df = pd.DataFrame(index=df.index)
+    export_df['estudiant'] = df['estudiant']
+    
+    # Add RA columns with their values
+    for col in ra_codes:
+        export_df[col] = df[col]
+    
+    # Add empty spacing columns
+    for col in new_columns:
+        if col not in export_df.columns:
+            export_df[col] = ''
+    
+    # Reorder columns
+    export_df = export_df[new_columns]
+    
+    # Export to Excel
+    output_path = output_path.replace('.csv', '.xlsx')
+    export_df.to_excel(output_path, index=False)
+    print(f"\t- Exported {len(export_df)} entries to {output_path}")
 
 
 def main(pdf_path: str, output_csv: str) -> None:
@@ -220,8 +331,8 @@ def main(pdf_path: str, output_csv: str) -> None:
     melted = select_melt_code_conv_grades(merged, name_col, code_pattern)
     # 8) Clean entry text
     melted['entry'] = clean_entries(melted['entry'])
-    # 9) Extract records using original entry_pattern
-    entry_pattern = re.compile(
+    # 9) Extract RA records using original entry_pattern
+    ra_entry_pattern = re.compile(
         r"""
         (?P<code>[A-Za-z0-9]{4,}                # MP code format
         _               
@@ -233,20 +344,23 @@ def main(pdf_path: str, output_csv: str) -> None:
         """,
         flags=re.IGNORECASE | re.VERBOSE
     )
-    records = extract_records(melted, name_col, entry_pattern)
-    # 10) Sort records by student and RA code
+    records = extract_ra_records(melted, name_col, ra_entry_pattern)
+    # 10) Get unique MP codes and identify those with EM entries (qualificació de pràctiques en empresa)
+    mp_codes = extract_mp_codes(records)
+    mp_codes_with_em = find_mp_codes_with_em(melted, mp_codes)
+    # 11) Sort records by student and RA code
     records = sort_records(records)
-    export_csv(records, 'preliminary_records.csv')
-    # 11) Pivot to wide format: students × RA codes
+    # 12) Pivot to wide format: students × RA codes
     wide = records.pivot(index='estudiant', columns='ra_code', values='grade')
-    wide = wide.fillna('')            # optional: blank instead of NaN
-    wide = wide.reset_index()         # make 'estudiant' a column again
-    # 12) Export to CSV
-    export_csv(wide, output_csv)
+    wide = wide.fillna('')                      # optional: blank instead of NaN
+    wide = wide.reset_index()                   # make 'estudiant' a column again
+    
+    # 13) Export to Excel with proper spacing between MP groups
+    export_excel_with_spacing(wide, output_csv, mp_codes_with_em, mp_codes)
 
 
 if __name__ == '__main__':
     # Example usage
-    PDF_FILE = 'ActaAvaluacioFlexible_Gestió Administrativa_1_1 GA-A ( CFPM AG10 )_2_263702.pdf'
-    OUTPUT_CSV = 'report_ra_marks.csv'
+    PDF_FILE = 'ActaAvaluacioFlexible_Gestió Administrativa_1_1 GA-A ( CFPM AG10 )_2_263702.pdf'
+    OUTPUT_CSV = 'report_ra_marks.xlsx'  # Changed extension to .xlsx
     main(PDF_FILE, OUTPUT_CSV)

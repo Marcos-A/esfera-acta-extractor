@@ -46,8 +46,9 @@ dist/
 *.bak
 discarded_tests/
 
-# Ignore all CSV, TXT and PDF files
+# Ignore all CSV, TXT, PDF and XLSX files
 ##############################
 *.csv
 *.pdf
 *.txt
+*.xlsx
