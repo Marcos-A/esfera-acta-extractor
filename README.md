@@ -57,11 +57,17 @@ docker build -t esfera-acta-extractor .
    ```bash
    python esfera-acta-extractor.py
    ```
+   To exit the interactive shell, simply type:
+   ```bash
+   exit
+   ```
 
-3. Stop the container (only needed if running in background):
-```bash
-docker stop $(docker ps -q --filter ancestor=esfera-acta-extractor)
-```
+3. Container cleanup:
+   - For interactive mode (`--rm` flag): Container is automatically removed upon exit
+   - For background processes: Stop the container with:
+   ```bash
+   docker stop $(docker ps -q --filter ancestor=esfera-acta-extractor)
+   ```
 
 **Note**: The script will:
 - Look for the PDF file in the current directory
