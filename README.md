@@ -1,15 +1,14 @@
-<!-- In README.md (Català) -->
 [Read this in English](README.en.md)
 
 # Esfer@ Acta Extractor
 
-Una eina en Python per extreure i processar els registres de qualificacions dels informes de notes en PDF d’Esfer@. L’eina extreu les taules dels PDF, processa les notes dels estudiants i genera un fitxer Excel amb una vista estructurada de les qualificacions de RA (Resultats d’Aprenentatge) i de les qualificacions de MP (Mòdul Professional).
+Una eina en Python per extreure i processar els registres de qualificacions de les actes de notes en PDF d’Esfer@. L’eina extreu les taules dels PDF, processa les notes dels estudiants i genera un fitxer Excel amb una vista estructurada de les qualificacions de RA (Resultats d’Aprenentatge) i de les qualificacions de MP (Mòdul Professional).
 
 ## Característiques
 
-- Extreu taules dels informes de notes en PDF  
+- Extreu taules dels informes de les actes de notes en PDF  
 - Processa els noms i les notes dels estudiants  
-- Identifica els MP amb entrades EM (Formació en el centre de treball)  
+- Identifica els MP amb entrades EM (amb hores d'estada a l'empresa)  
 - Genera fitxers Excel amb:  
   - Notes dels estudiants per a cada RA  
   - Columnes espaiades correctament per a les qualificacions de MP  
@@ -121,7 +120,7 @@ cd esfera-acta-extractor
 pip install -r requirements.txt
 ```
 
-3. Executa l'script:
+3. Executa l'_script_:
 ```bash
 python esfera-acta-extractor.py
 ```
@@ -134,7 +133,7 @@ python esfera-acta-extractor.py
 - Formats de qualificació esperats: A#, PDT, EP, NA
 
 ### Sortida
-- Fitxer Excel anomenat amb el codi de grup (p. ex., CFPM_AG10101.xlsx)
+- Fitxer Excel anomenat amb el codi de grup (p. ex., `CFPM_AG10101.xlsx`)
 - Conté:
   - Noms dels estudiants
   - Notes de RA agrupades per MP
@@ -144,36 +143,36 @@ python esfera-acta-extractor.py
 ## Desenvolupament
 
 El projecte utilitza:
-- pandas per a la manipulació de dades
-- pdfplumber per al processament de PDFs
-- openpyxl per a la generació de fitxers Excel
-- tabulate per a la sortida de depuració/desenvolupament
+- `pandas` per a la manipulació de dades
+- `pdfplumber` per al processament de PDFs
+- `openpyxl` per a la generació de fitxers Excel
+- `tabulate` per a la sortida de depuració/desenvolupament
 
 ## Contribuir
 
-1. Fes un fork del repositori
-2. Crea la teva branca de funció (git checkout -b feature/AmazingFeature)
-3. Fes commit dels teus canvis (git commit -m 'Add some AmazingFeature')
-4. Puja la branca (git push origin feature/AmazingFeature)
-5. Obre una Pull Request
+1. Feu un _fork_ del repositori
+2. Creeu la teva branca de funció (`git checkout -b feature/AmazingFeature`)
+3. Feu _commit_ dels vostres canvis (`git commit -m 'Add some AmazingFeature'`)
+4. Pugeu la branca (`git push origin feature/AmazingFeature`)
+5. Obriu una _Pull Request_
 
 ## Llicència
 
-Aquest projecte està llicenciat sota la GNU General Public License v3.0 – consulta el fitxer [LICENSE](LICENSE) per a més detalls.
+Aquest projecte està llicenciat sota la GNU General Public License v3.0 – consulteu el fitxer [LICENSE](LICENSE) per a més detalls.
 
-Això significa que pots:
+Això significa que podeu:
 - Utilitzar el programari per a qualsevol propòsit
 - Modificar el programari per adaptar-lo a les teves necessitats
-- Compartir el programari amb els teus amics i veïns
-- Compartir els canvis que facis
+- Compartir el programari amb altra gent
+- Compartir els canvis que en facis
 
-Però has de:
+Però heu de:
 - Compartir el codi font quan comparteixis el programari
 - Llicenciar qualsevol obra derivada sota GPL-3.0
 - Indicar canvis significatius realitzats al programari
-- Incloure la llicència original i els avisos de copyright
+- Incloure la llicència original i els avisos de _copyright_
 
 ## Agraïments
 
 - Creat per processar els informes de qualificacions educatives d'Esfer@
- Dissenyat per gestionar formats de PDF específics del sistema educatiu català
+- Dissenyat per gestionar formats de PDF específics del sistema educatiu català
