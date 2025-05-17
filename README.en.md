@@ -1,5 +1,4 @@
-<!-- In README.md (Català) -->
-[Read this in Catalan](README.md)
+[Llegiu-lo en català](README.md)
 
 # Esfer@ Acta Extractor
 
