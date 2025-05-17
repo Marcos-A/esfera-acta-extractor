@@ -1,175 +1,179 @@
+<!-- In README.md (Català) -->
+[Read this in English](README.en.md)
+
 # Esfer@ Acta Extractor
 
-A Python tool to extract and process grade records from Esfer@'s PDF grade reports. The tool parses PDF tables, processes student grades, and generates an Excel file with a structured view of RA (Learning Achievement) grades and MP (Professional Module) qualifications.
+Una eina en Python per extreure i processar els registres de qualificacions dels informes de notes en PDF d’Esfer@. L’eina extreu les taules dels PDF, processa les notes dels estudiants i genera un fitxer Excel amb una vista estructurada de les qualificacions de RA (Resultats d’Aprenentatge) i de les qualificacions de MP (Mòdul Professional).
 
-## Features
+## Característiques
 
-- Extracts tables from PDF grade reports
-- Processes student names and grades
-- Identifies MPs with EM (Workplace Training) entries
-- Generates Excel files with:
-  - Student grades for each RA
-  - Properly spaced columns for MP qualifications
-  - Special column layout for MPs with EM entries
+- Extreu taules dels informes de notes en PDF  
+- Processa els noms i les notes dels estudiants  
+- Identifica els MP amb entrades EM (Formació en el centre de treball)  
+- Genera fitxers Excel amb:  
+  - Notes dels estudiants per a cada RA  
+  - Columnes espaiades correctament per a les qualificacions de MP  
+  - Disposició especial de columnes per als MP amb entrades EM  
 
-## Requirements
+## Requisits
 
-- Docker (recommended)
-- Python 3.9+ (if running locally)
-- Required Python packages listed in `requirements.txt`
+- Docker (recomanat)  
+- Python 3.9+ (si s’executa localment)  
+- Paquets de Python necessaris enumerats a `requirements.txt`  
 
-## Project Structure
+## Estructura del projecte
 
 ```
 .
-├── src/                      # Source code package
-│   ├── __init__.py           # Package initialization and exports
-│   ├── pdf_processor.py      # PDF extraction and processing
-│   ├── data_processor.py     # Data cleaning and transformation
-│   ├── grade_processor.py    # Grade-specific operations
-│   └── excel_processor.py    # Excel file generation and formatting
-├── Dockerfile                # Docker configuration
-├── README.md                 # This file
-├── requirements.txt          # Python dependencies
-├── LICENSE                   # GNU GPL-3.0 license
-└── esfera-acta-extractor.py  # Main script
+├── src/                      # Paquet de codi font
+│   ├── __init__.py           # Inicialització i exportacions del paquet
+│   ├── pdf_processor.py      # Extracció i processament de PDF
+│   ├── data_processor.py     # Neteja i transformació de dades
+│   ├── grade_processor.py    # Operacions específiques de notes
+│   └── excel_processor.py    # Generació i formatatge d'Excel
+├── Dockerfile                # Configuració Docker
+├── README.md                 # Aquest fitxer (català)
+├── README.en.md              # Versió en anglès
+├── requirements.txt          # Dependències Python
+├── LICENSE                   # Llicència GNU GPL-3.0 completa
+└── esfera-acta-extractor.py  # Script principal
 
 ```
 
-### Module Description
+### Descripció dels mòduls
 
-- **pdf_processor.py**: Handles all PDF-related operations
-  - Table extraction from PDFs
-  - Group code extraction from first page
-  
-- **data_processor.py**: General data processing utilities
-  - Header normalization
-  - Column filtering and transformation
-  - Data cleaning and reshaping
-  
-- **grade_processor.py**: Grade-specific logic
-  - RA record extraction
-  - MP code identification
-  - EM entry detection
-  - Record sorting
-  
-- **excel_processor.py**: Excel file handling
-  - Excel file generation
-  - Column spacing and organization
-  - (Future) Formatting and formulas
+- **pdf_processor.py**: Gestiona totes les operacions relacionades amb PDF  
+  - Extracció de taules dels PDF  
+  - Extracció del codi de grup de la primera pàgina  
 
-## Installation & Usage
+- **data_processor.py**: Utilitats generals de processament de dades  
+  - Normalització d'encapçalaments  
+  - Filtrat i transformació de columnes  
+  - Neteja i reformat de dades  
 
-### Using Docker (Recommended)
+- **grade_processor.py**: Lògica específica de qualificacions  
+  - Extracció de registres de RA  
+  - Identificació de codi MP  
+  - Detecció d'entrades EM  
+  - Ordenació de registres  
 
-**Important**: Place your Esfer@ PDF file in the root folder of the project before running any Docker commands.
+- **excel_processor.py**: Gestió de fitxers Excel  
+  - Generació de fitxers Excel  
+  - Espaiat i organització de columnes  
+  - (Futur) Format i fórmules  
 
-1. Build the Docker image:
+## Instal·lació i ús
+
+### Ús amb Docker (recomanat)
+
+**Important**: Col·loca el teu fitxer PDF d'Esfer@ a la carpeta arrel del projecte abans d'executar qualsevol comanda de Docker.
+
+1. Construeix la imatge de Docker:
 ```bash
 docker build -t esfera-acta-extractor .
 ```
 
-2. You have two options to run the container:
+Tens dues opcions per executar el contenidor:
 
-   a. Direct execution:
+   a. Execució directa:
    ```bash
    docker run -v $(pwd):/app esfera-acta-extractor python esfera-acta-extractor.py
    ```
 
-   b. Interactive mode (recommended for debugging or multiple files):
+   b. Mode interactiu (recomanat per a depuració o diversos fitxers):
    ```bash
    docker run --rm -it \
      -v "$(pwd)":/data \
      -w /data \
      esfera-acta-extractor
    ```
-   Once inside the container, you can run:
+   Un cop dins el contenidor, pots executar:
    ```bash
    python esfera-acta-extractor.py
    ```
-   To exit the interactive shell, simply type:
+   Per sortir de l'intèrpret interactiu, simplement escriu:
    ```bash
    exit
    ```
 
-3. Container cleanup:
-   - For interactive mode (`--rm` flag): Container is automatically removed upon exit
-   - For background processes: Stop the container with:
+3. Neteja del contenidor:
+   - Per al mode interactiu (opció --rm): el contenidor s'elimina automàticament en sortir
+   - Per a processos en segon pla: atura el contenidor amb:
    ```bash
    docker stop $(docker ps -q --filter ancestor=esfera-acta-extractor)
    ```
 
-**Note**: The script will:
-- Look for the PDF file in the current directory
-- Generate the Excel output file in the same directory
-- Name the output file based on the group code found in the PDF
+**Nota**: L'eina:
+- Buscarà el fitxer PDF al directori actual
+- Generarà el fitxer Excel de sortida al mateix directori
+- Anomenarà el fitxer de sortida segons el codi de grup trobat al PDF
 
-### Local Installation
+#### Instal·lació local
 
-1. Clone the repository:
+1. Clona el repositori:
 ```bash
 git clone https://github.com/yourusername/esfera-acta-extractor.git
 cd esfera-acta-extractor
 ```
 
-2. Install dependencies:
+2. Instal·la les dependències:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the script:
+3. Executa l'script:
 ```bash
 python esfera-acta-extractor.py
 ```
 
-## Input/Output
+## Entrada/Sortida
 
-### Input
-- PDF file from Esfer@ containing grade tables
-- File should include "Codi del grup" field in the first page
-- Expected grade formats: A#, PDT, EP, NA
+### Entrada
+- Fitxer PDF d'Esfer@ amb taules de qualificacions
+- El fitxer ha d'incloure el camp "Codi del grup" a la primera pàgina
+- Formats de qualificació esperats: A#, PDT, EP, NA
 
-### Output
-- Excel file named with the group code (e.g., `CFPM_AG10101.xlsx`)
-- Contains:
-  - Student names
-  - RA grades grouped by MP
-  - 3 empty columns after MPs with EM entries (labeled as CENTRE, EMPRESA, MP)
-  - 1 empty column after regular MPs (labeled as MP)
+### Sortida
+- Fitxer Excel anomenat amb el codi de grup (p. ex., CFPM_AG10101.xlsx)
+- Conté:
+  - Noms dels estudiants
+  - Notes de RA agrupades per MP
+  - 3 columnes buides després dels MP amb entrades EM (etiquetades com a CENTRE, EMPRESA, MP)
+  - 1 columna buida després dels MP normals (etiquetada com a MP)
 
-## Development
+## Desenvolupament
 
-The project uses:
-- `pandas` for data manipulation
-- `pdfplumber` for PDF parsing
-- `openpyxl` for Excel file generation
-- `tabulate` for development/debugging output
+El projecte utilitza:
+- pandas per a la manipulació de dades
+- pdfplumber per al processament de PDFs
+- openpyxl per a la generació de fitxers Excel
+- tabulate per a la sortida de depuració/desenvolupament
 
-## Contributing
+## Contribuir
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. Fes un fork del repositori
+2. Crea la teva branca de funció (git checkout -b feature/AmazingFeature)
+3. Fes commit dels teus canvis (git commit -m 'Add some AmazingFeature')
+4. Puja la branca (git push origin feature/AmazingFeature)
+5. Obre una Pull Request
 
-## License
+## Llicència
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+Aquest projecte està llicenciat sota la GNU General Public License v3.0 – consulta el fitxer [LICENSE](LICENSE) per a més detalls.
 
-This means you can:
-- Use the software for any purpose
-- Change the software to suit your needs
-- Share the software with your friends and neighbors
-- Share the changes you make
+Això significa que pots:
+- Utilitzar el programari per a qualsevol propòsit
+- Modificar el programari per adaptar-lo a les teves necessitats
+- Compartir el programari amb els teus amics i veïns
+- Compartir els canvis que facis
 
-But you must:
-- Share the source code when you share the software
-- License any derivative work under GPL-3.0
-- State significant changes made to the software
-- Include the original license and copyright notices
+Però has de:
+- Compartir el codi font quan comparteixis el programari
+- Llicenciar qualsevol obra derivada sota GPL-3.0
+- Indicar canvis significatius realitzats al programari
+- Incloure la llicència original i els avisos de copyright
 
-## Acknowledgments
+## Agraïments
 
-- Built for processing Esfer@'s educational grade reports
-- Designed to handle specific PDF formats from the Catalan educational system
+- Creat per processar els informes de qualificacions educatives d'Esfer@
+ Dissenyat per gestionar formats de PDF específics del sistema educatiu català
