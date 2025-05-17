@@ -22,11 +22,41 @@ A Python tool to extract and process grade records from Esfer@'s PDF grade repor
 
 ```
 .
+├── src/                      # Source code package
+│   ├── __init__.py           # Package initialization and exports
+│   ├── pdf_processor.py      # PDF extraction and processing
+│   ├── data_processor.py     # Data cleaning and transformation
+│   ├── grade_processor.py    # Grade-specific operations
+│   └── excel_processor.py    # Excel file generation and formatting
 ├── Dockerfile                # Docker configuration
 ├── README.md                 # This file
 ├── requirements.txt          # Python dependencies
+├── LICENSE                   # GNU GPL-3.0 license
 └── esfera-acta-extractor.py  # Main script
+
 ```
+
+### Module Description
+
+- **pdf_processor.py**: Handles all PDF-related operations
+  - Table extraction from PDFs
+  - Group code extraction from first page
+  
+- **data_processor.py**: General data processing utilities
+  - Header normalization
+  - Column filtering and transformation
+  - Data cleaning and reshaping
+  
+- **grade_processor.py**: Grade-specific logic
+  - RA record extraction
+  - MP code identification
+  - EM entry detection
+  - Record sorting
+  
+- **excel_processor.py**: Excel file handling
+  - Excel file generation
+  - Column spacing and organization
+  - (Future) Formatting and formulas
 
 ## Installation & Usage
 
