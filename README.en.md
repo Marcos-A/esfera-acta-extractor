@@ -163,7 +163,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 This means you can:
 - Use the software for any purpose
 - Change the software to suit your needs
-- Share the software with your friends and professional colleagues
+- Share the software with other people
 - Share the changes you make
 
 But you must:
