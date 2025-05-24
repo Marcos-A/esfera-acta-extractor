@@ -13,6 +13,7 @@ Una eina en Python per extreure i processar els registres de qualificacions de l
   - Notes dels estudiants per a cada RA  
   - Columnes espaiades correctament per a les qualificacions de MP  
   - Disposició especial de columnes per als MP amb entrades EM  
+  - Protecció de cèl·lules: Totes les cèl·lules estan bloquejades excepte les cèl·lules de percentatges de RA a la darrera fila. Utilitzeu la contrasenya "edita'm" per desbloquejar.  
 
 ## Requisits
 

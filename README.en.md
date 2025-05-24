@@ -13,6 +13,7 @@ A Python tool to extract and process grade records from Esfer@'s PDF grade repor
   - Student grades for each RA
   - Properly spaced columns for MP qualifications
   - Special column layout for MPs with EM entries
+  - Cell protection: All cells are locked except RA percentage cells in the last row. Use password "edita'm" to unlock.
 
 ## Requirements
 
