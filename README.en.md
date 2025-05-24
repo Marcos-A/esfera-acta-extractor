@@ -111,7 +111,7 @@ docker build -t esfera-acta-extractor .
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/esfera-acta-extractor.git
+git clone https://github.com/Marcos-A/esfera-acta-extractor.git
 cd esfera-acta-extractor
 ```
 

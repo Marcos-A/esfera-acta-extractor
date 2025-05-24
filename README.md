@@ -111,7 +111,7 @@ Tens dues opcions per executar el contenidor:
 
 1. Clona el repositori:
 ```bash
-git clone https://github.com/yourusername/esfera-acta-extractor.git
+git clone https://github.com/Marcos-A/esfera-acta-extractor.git
 cd esfera-acta-extractor
 ```
 
