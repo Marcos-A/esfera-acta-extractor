@@ -5,7 +5,7 @@ Excel processing module for generating and formatting grade reports.
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
-from openpyxl.styles import numbers, PatternFill, Font, Border, Side, Alignment
+from openpyxl.styles import numbers, PatternFill, Font, Border, Side, Alignment, Protection
 from openpyxl.formatting.rule import CellIsRule, FormulaRule
 from openpyxl.worksheet.datavalidation import DataValidation
 
@@ -611,6 +611,54 @@ def apply_mp_sum_formulas(
     wb.save(workbook_path)
 
 
+def apply_cell_protection(
+    workbook_path: str,
+    mp_codes_with_em: list[str],
+    mp_codes: list[str],
+    mp_groups: dict[str, list[str]]
+) -> None:
+    """
+    Apply cell protection to Excel file:
+    - Lock all cells except RA percentage cells in the last row
+    - Use password "edita'm" for protection
+    - Allow editing only for RA percentage cells
+    """
+    wb = load_workbook(workbook_path)
+    ws = wb.active
+    last_row = ws.max_row
+    
+    # Lock all cells first
+    for row in ws.iter_rows():
+        for cell in row:
+            cell.protection = Protection(locked=True)
+    
+    # Helper function to find column letter for a header
+    def get_column_for_header(header: str) -> str:
+        for cell in ws[1]:  # First row
+            if cell.value:
+                # Remove any line breaks from both the cell value and the header for comparison
+                cell_value = str(cell.value).replace('\n', '')
+                header_clean = header.replace('\n', '')
+                if cell_value == header_clean:
+                    return get_column_letter(cell.column)
+        return None
+
+    # Unlock only RA grade columns in last row
+    for mp_code in mp_codes:
+        # Find RA columns for this MP
+        for ra in mp_groups[mp_code]:
+            col = get_column_for_header(ra)
+            if col:
+                cell = ws[f'{col}{last_row}']
+                cell.protection = Protection(locked=False)
+    
+    # Protect the sheet with password
+    ws.protection.sheet = True
+    ws.protection.password = "edita'm"
+    
+    wb.save(workbook_path)
+
+
 def export_excel_with_spacing(
     df: pd.DataFrame,
     output_path: str,
@@ -621,10 +669,113 @@ def export_excel_with_spacing(
     Export DataFrame to Excel with specific column spacing after each MP's RAs.
     - 3 empty columns after MPs with EM (named: MP CENTRE, MP EMPRESA, MP)
     - 1 empty column after other MPs (named: MP)
+    - Adds a "PONDERACIÓ (%}" row after student entries with percentage calculations
+    - Uses Excel formulas to dynamically sum RA percentages for each MP
+    - Applies data validation for percentage cells
+    - Applies conditional formatting for invalid grades
+    - Protects all cells except RA percentage cells
+    Uses pre-computed mp_codes list for efficient grouping.
+    """
+    # Get the current column order (excluding 'estudiant')
+    ra_codes = [col for col in df.columns if col != 'estudiant']
+    
+    # Group RA codes by their MP using existing mp_codes
+    mp_groups = {mp: [] for mp in mp_codes}  # Initialize with known MPs
+    for ra_code in ra_codes:
+        # Find which MP this RA belongs to
+        for mp_code in mp_codes:
+            if ra_code.startswith(mp_code):
+                mp_groups[mp_code].append(ra_code)
+                break
+    
+    # Add empty spacing columns with explicit numeric type for calculations
+    new_columns = ['estudiant']  # Start with student name column
+    for mp_code in mp_codes:
+        # Add RA columns for this MP
+        for ra in mp_groups[mp_code]:
+            new_columns.append(ra)
+        
+        # Add spacing columns based on whether this MP has EM
+        if mp_code in mp_codes_with_em:
+            new_columns.extend([
+                f'{mp_code} CENTRE',
+                f'{mp_code} EMPRESA',
+                f'{mp_code}'
+            ])
+        else:
+            new_columns.append(f'{mp_code}')
+    
+    # Create DataFrame with proper column order
+    export_df = pd.DataFrame(columns=new_columns)
+    export_df['estudiant'] = df['estudiant']
+    
+    # Add RA columns with their values, preserving numeric types
+    for col in ra_codes:
+        export_df[col] = df[col]
+    
+    # Add empty spacing columns with explicit numeric type for calculations
+    for col in new_columns:
+        if col not in export_df.columns:
+            # Create empty column with float64 type and fill with NaN
+            export_df[col] = pd.Series(dtype='float64')
+    
+    # Reorder columns
+    export_df = export_df[new_columns]
+    
+    # Initialize percentages for the last row (RA columns and EM columns)
+    percentages = initialize_grade_weights(export_df, mp_groups, mp_codes_with_em)
+    
+    # Add "PONDERACIÓ (%}" row with initial percentages
+    ponderacio_row = pd.DataFrame([percentages], columns=new_columns)
+    ponderacio_row.iloc[0, 0] = 'PONDERACIÓ (%)'
+    
+    # Filter out empty or all-NA columns before concatenation
+    non_empty_columns = [col for col in new_columns if not export_df[col].isna().all()]
+    export_df = export_df[non_empty_columns]
+    ponderacio_row = ponderacio_row[non_empty_columns]
+    
+    # Concatenate while preserving numeric types
+    export_df = pd.concat([export_df, ponderacio_row], ignore_index=True)
+    
+    # Convert numeric columns to float64 explicitly
+    numeric_cols = export_df.select_dtypes(include=['int64', 'float64']).columns
+    for col in numeric_cols:
+        # Convert to float64 with NaN for missing values
+        export_df[col] = pd.to_numeric(export_df[col], errors='coerce').astype('float64')
+    
+    # Replace NaN with empty string only in non-numeric columns
+    non_numeric_cols = export_df.columns.difference(numeric_cols)
+    export_df[non_numeric_cols] = export_df[non_numeric_cols].fillna('')
+    
+    # Export to Excel
+    output_path = output_path.replace('.csv', '.xlsx')
+    export_df.to_excel(output_path, index=False)
+    
+    # Apply Excel formulas for MP sums
+    apply_mp_sum_formulas(output_path, mp_groups, mp_codes_with_em, mp_codes)
+    
+    # Apply row formatting (borders, bold, background colors)
+    apply_row_formatting(output_path, mp_codes_with_em, mp_codes)
+    
+    # Apply data validation for percentage cells
+    apply_data_validation(output_path, mp_groups, mp_codes)
+    
+    # Apply conditional formatting (now without percentage validation)
+    apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes)
+    
+    print(f"\t- Exported {len(export_df)-1} entries to {output_path}")
+    
+    # Apply cell protection
+    apply_cell_protection(output_path, mp_codes_with_em, mp_codes, mp_groups)
+    """
+    Export DataFrame to Excel with specific column spacing after each MP's RAs.
+    - 3 empty columns after MPs with EM (named: MP CENTRE, MP EMPRESA, MP)
+    - 1 empty column after other MPs (named: MP)
     - Adds a "PONDERACIÓ (%)" row after student entries with percentage calculations
     - Uses Excel formulas to dynamically sum RA percentages for each MP
     - Applies data validation for percentage cells
     - Applies conditional formatting for invalid grades
+    - Protects all cells except RA percentage cells
     Uses pre-computed mp_codes list for efficient grouping.
     """
     # Get the current column order (excluding 'estudiant')
@@ -704,19 +855,6 @@ def export_excel_with_spacing(
     
     # Apply conditional formatting (now without percentage validation)
     apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes)
-    
-    print(f"\t- Exported {len(export_df)-1} entries to {output_path}")
-
-
-# Future Excel formatting functions can be added here:
-# def apply_conditional_formatting(workbook: Workbook) -> None:
-#     """Apply conditional formatting to grade cells."""
-#     pass
-#
-# def protect_worksheet(worksheet: Worksheet) -> None:
-#     """Protect specific ranges in the worksheet."""
-#     pass
-#
-# def add_grade_formulas(worksheet: Worksheet) -> None:
-#     """Add grade calculation formulas."""
-#     pass 
+        
+    # Apply cell protection
+    apply_cell_protection(output_path, mp_codes_with_em, mp_codes, mp_groups)
