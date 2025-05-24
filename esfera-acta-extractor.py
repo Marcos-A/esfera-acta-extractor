@@ -82,8 +82,10 @@ def main(pdf_path: str) -> None:
     records = sort_records(records)
     # 12) Pivot to wide format: students × RA codes
     wide = records.pivot(index='estudiant', columns='ra_code', values='grade')
-    wide = wide.fillna('')                      # optional: blank instead of NaN
-    wide = wide.reset_index()                   # make 'estudiant' a column again
+    # Convert to best possible dtypes and fill NaN with empty strings
+    wide = wide.convert_dtypes().fillna('')
+    wide = wide.reset_index()
+    
     # 13) Export to Excel with proper spacing between MP groups
     export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes)
 

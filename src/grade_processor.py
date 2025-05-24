@@ -13,10 +13,17 @@ def extract_ra_records(
 ) -> pd.DataFrame:
     """
     Extract RA code & grade pairs from each entry via regex.
+    Transforms grades:
+    - Numeric grades (e.g. 'A7') are converted to integers (7)
+    - Non-numeric grades (PDT, EP, NA) are kept as strings
     """
     rows = []
     for _, row in melted.iterrows():
         for code, grade in entry_pattern.findall(row['entry']):
+            # Transform grade: convert 'A#' to integer, keep others as strings
+            if grade.startswith('A') and grade[1:].isdigit():
+                grade = int(grade[1:])  # Convert to integer
+            
             rows.append({
                 'estudiant': row[name_col],
                 'ra_code': code,
