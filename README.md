@@ -79,21 +79,29 @@ Tens dues opcions per executar el contenidor:
    docker run -v $(pwd):/app esfera-acta-extractor python esfera-acta-extractor.py
    ```
 
-   b. Mode interactiu (recomanat per a depuració o diversos fitxers):
+   b. Mode interactiu (recomanat per depuració o múltiples fitxers):
    ```bash
    docker run --rm -it \
      -v "$(pwd)":/data \
      -w /data \
      esfera-acta-extractor
    ```
-   Un cop dins el contenidor, pots executar:
+   Una vegada dins el contenidor, pots executar:
    ```bash
    python esfera-acta-extractor.py
    ```
-   Per sortir de l'intèrpret interactiu, simplement escriu:
+   Per sortir de la shell interactiva, simplement escriu:
    ```bash
    exit
    ```
+
+**Nota**: El script:
+- Buscarà els fitxers PDF en el directori `input_pdf_files`
+- Processarà cada fitxer PDF individualment
+- Generarà els fitxers Excel de sortida en el directori `output_xlsx_files`
+- Anomenarà cada fitxer de sortida basant-se en el codi de grup trobat en el seu PDF corresponent
+- Saltarà els fitxers que no són PDFs o no es poden processar
+- Continuarà processant els fitxers restants fins i tot si algun falla
 
 3. Neteja del contenidor:
    - Per al mode interactiu (opció --rm): el contenidor s'elimina automàticament en sortir

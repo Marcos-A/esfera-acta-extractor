@@ -26,12 +26,6 @@ def extract_tables(pdf_path: str, table_opts: dict = None) -> list[pd.DataFrame]
             headers, *rows = raw
             tables.append(pd.DataFrame(rows, columns=headers))
 
-    with open('extracted_tables.txt', 'w', encoding='utf-8') as summary:
-        for i, df in enumerate(tables, start=1):
-            summary.write(f"-- Table {i} --\n")
-            summary.write(df.to_string(index=False))
-            summary.write("\n\n")
-
     return tables
 
 

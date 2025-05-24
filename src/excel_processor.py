@@ -318,6 +318,14 @@ def apply_conditional_formatting(
                         font=red_font
                     )
                     ws.conditional_formatting.add(cell_range, out_of_range_rule)
+                    
+                    # Red text if number is less than 5
+                    less_than_five_rule = FormulaRule(
+                        formula=[f'AND(ISNUMBER({cell_range}), {cell_range}<5)'],
+                        stopIfTrue=True,
+                        font=red_font
+                    )
+                    ws.conditional_formatting.add(cell_range, less_than_five_rule)
                 
                 # Add red background rule for blank percentage cell in last row
                 cell_range = f'{col}{last_row}'

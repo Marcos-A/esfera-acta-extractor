@@ -1,11 +1,10 @@
 """
 PDF Grade Extractor - Educational Grade Report Parser
 
-This script extracts student grades from PDF reports by:
-1. Reading tables from a PDF file
-2. Processing and cleaning the data
-3. Extracting specific grade information
-4. Outputting a clean Excel file with student names and grades
+This script extracts student grades from multiple PDF reports by:
+1. Scanning input directory for PDF files
+2. Processing each PDF file individually
+3. Exporting results to separate Excel files in output directory
 
 Dependencies:
 - pdfplumber: For extracting tables from PDFs
@@ -15,7 +14,9 @@ Dependencies:
 - openpyxl: For Excel file generation
 """
 
+import os
 import re
+import glob
 import pandas as pd
 from src import (
     extract_tables,
@@ -34,10 +35,13 @@ from src import (
 )
 
 
-def main(pdf_path: str) -> None:
+def process_pdf(pdf_path: str) -> None:
+    """
+    Process a single PDF file and generate the corresponding Excel output.
+    """
     # Extract group code for filename
     group_code = extract_group_code(pdf_path)
-    output_xlsx = f'{group_code}.xlsx'
+    output_xlsx = os.path.join('output_xlsx_files', f'{group_code}.xlsx')
     
     # 1) Extract tables
     tables = extract_tables(pdf_path)
@@ -90,7 +94,31 @@ def main(pdf_path: str) -> None:
     export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes)
 
 
+def main() -> None:
+    """
+    Process all PDF files in the input directory.
+    """
+    # Create output directory if it doesn't exist
+    os.makedirs('output_xlsx_files', exist_ok=True)
+    
+    # Get all PDF files in the input directory
+    pdf_files = glob.glob('input_pdf_files/*.pdf')
+    
+    if not pdf_files:
+        print("No PDF files found in the input_pdf_files directory.")
+        return
+    
+    print(f"Found {len(pdf_files)} PDF files to process.")
+    
+    # Process each PDF file
+    for pdf_file in pdf_files:
+        print(f"\nProcessing {pdf_file}...")
+        try:
+            process_pdf(pdf_file)
+            print(f"Successfully processed {pdf_file}")
+        except Exception as e:
+            print(f"Error processing {pdf_file}: {str(e)}")
+
+
 if __name__ == '__main__':
-    # Example usage
-    PDF_FILE = 'ActaAvaluacioFlexible_Gestió Administrativa_1_1 GA-A ( CFPM AG10 )_2_263702.pdf'
-    main(PDF_FILE)
+    main()

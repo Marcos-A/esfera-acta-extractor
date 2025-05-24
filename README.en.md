@@ -95,6 +95,14 @@ docker build -t esfera-acta-extractor .
    exit
    ```
 
+**Note**: The script will:
+- Look for PDF files in the `input_pdf_files` directory
+- Process each PDF file individually
+- Generate Excel output files in the `output_xlsx_files` directory
+- Name each output file based on the group code found in its corresponding PDF
+- Skip any files that are not PDFs or cannot be processed
+- Continue processing remaining files even if some fail
+
 3. Container cleanup:
    - For interactive mode (`--rm` flag): Container is automatically removed upon exit
    - For background processes: Stop the container with:
