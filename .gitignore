@@ -46,11 +46,18 @@ dist/
 *.bak
 discarded_tests/
 
-# Ignore all CSV, TXT, PDF and XLSX files
+# Ignore contents of input and output directories
+##############################
+input_pdf_files/*
+!input_pdf_files/.gitkeep
+output_xlsx_files/*
+!output_xlsx_files/.gitkeep
+
+# Ignore other file types
 ##############################
 *.csv
-*.pdf
 *.txt
+*.pdf
 *.xlsx
 
 # But keep requirements.txt

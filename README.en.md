@@ -24,6 +24,10 @@ A Python tool to extract and process grade records from Esfer@'s PDF grade repor
 
 ```
 .
+├── input_pdf_files/          # Directory for input PDF files
+│   └── .gitkeep              # Keeps directory in git but ignores contents
+├── output_xlsx_files/        # Directory for output Excel files
+│   └── .gitkeep              # Keeps directory in git but ignores contents
 ├── src/                      # Source code package
 │   ├── __init__.py           # Package initialization and exports
 │   ├── pdf_processor.py      # PDF extraction and processing
