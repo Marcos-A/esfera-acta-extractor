@@ -427,14 +427,15 @@ def apply_mp_sum_formulas(
     For MPs with EM:
     - MP CENTRE column:
       * Checks if RA percentages sum to 90%, shows error if not
-      * For students: checks if all RA grades are valid numbers before applying SUMPRODUCT
+      * For students: checks if all values are valid numbers using COUNT
       * For percentage row: sums all RA percentages
     - MP EMPRESA column is set to 10%
     - MP column uses SUMPRODUCT between CENTRE and EMPRESA columns, rounded to integer
     For other MPs:
     - MP column:
       * Checks if RA percentages sum to 100%, shows error if not
-      * Checks if all RA grades are valid numbers before applying SUMPRODUCT, rounded to integer
+      * Checks if all values are valid numbers using COUNT
+      * Uses SUMPRODUCT for weighted calculation, rounded to integer
     
     Args:
         workbook_path: Path to the Excel workbook
@@ -474,12 +475,6 @@ def apply_mp_sum_formulas(
             first_ra_col = ra_columns[0]
             last_ra_col = ra_columns[-1]
             
-            # Create the check for all RA cells being valid numbers
-            valid_numbers_check = []
-            for ra_col in ra_columns:
-                valid_numbers_check.append(f'AND(ISNUMBER({ra_col}{{row}}),NOT(ISBLANK({ra_col}{{row}})))')
-            all_valid_check = f'AND({",".join(valid_numbers_check)})'
-            
             if mp_code in mp_codes_with_em:
                 # For MPs with EM:
                 # 1. CENTRE column gets the SUMPRODUCT formula with validation
@@ -488,11 +483,11 @@ def apply_mp_sum_formulas(
                     # Apply formula to each student row
                     for row in range(2, last_row):  # Skip header and percentage row
                         cell = ws[f'{centre_column}{row}']
-                        # Create formula that first checks RA percentage sum, then valid numbers
+                        # Create formula that first checks RA percentage sum, then valid numbers using COUNT
                         cell.value = (
                             f'=IF(SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})<>0.9,'
                             f'"ELS RA HAN DE SUMAR 90%",'
-                            f'IF({all_valid_check.format(row=row)},'
+                            f'IF(COUNT({first_ra_col}{row}:{last_ra_col}{row})=COLUMNS({first_ra_col}{row}:{last_ra_col}{row}),'
                             f'SUMPRODUCT({first_ra_col}{row}:{last_ra_col}{row},'
                             f'{first_ra_col}{last_row}:{last_ra_col}{last_row}),'
                             f'"AVALUACIONS PENDENTS"))'
@@ -537,11 +532,11 @@ def apply_mp_sum_formulas(
                     # Apply formula to each student row
                     for row in range(2, last_row):  # Skip header and percentage row
                         cell = ws[f'{mp_column}{row}']
-                        # Create formula that first checks RA percentage sum, then valid numbers
+                        # Create formula that first checks RA percentage sum, then valid numbers using COUNT
                         cell.value = (
                             f'=IF(SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})<>1,'
                             f'"ELS RA HAN DE SUMAR 100%",'
-                            f'IF({all_valid_check.format(row=row)},'
+                            f'IF(COUNT({first_ra_col}{row}:{last_ra_col}{row})=COLUMNS({first_ra_col}{row}:{last_ra_col}{row}),'
                             f'ROUND(SUMPRODUCT({first_ra_col}{row}:{last_ra_col}{row},'
                             f'{first_ra_col}{last_row}:{last_ra_col}{last_row}),0),'
                             f'"AVALUACIONS PENDENTS"))'
