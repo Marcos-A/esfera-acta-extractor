@@ -86,8 +86,16 @@ def process_pdf(pdf_path: str) -> None:
     records = sort_records(records)
     # 12) Pivot to wide format: students × RA codes
     wide = records.pivot(index='estudiant', columns='ra_code', values='grade')
-    # Convert to best possible dtypes and fill NaN with empty strings
-    wide = wide.convert_dtypes().fillna('')
+    
+    # Convert numeric grades to float where possible, keep others as strings
+    for col in wide.columns:
+        if col != 'estudiant':
+            # Convert to float if possible, keep as string if not
+            wide[col] = pd.to_numeric(wide[col], errors='coerce')
+            # Fill NaN with empty string for string columns
+            if pd.api.types.is_string_dtype(wide[col]):
+                wide[col] = wide[col].fillna('')
+    
     wide = wide.reset_index()
     
     # 13) Export to Excel with proper spacing between MP groups

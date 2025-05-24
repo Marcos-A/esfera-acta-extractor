@@ -45,6 +45,7 @@ dist/
 *.temp
 *.bak
 discarded_tests/
+original_pdf_files/
 
 # Ignore contents of input and output directories
 ##############################

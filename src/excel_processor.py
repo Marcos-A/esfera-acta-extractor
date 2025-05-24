@@ -663,8 +663,9 @@ def export_excel_with_spacing(
     # Add empty spacing columns with explicit numeric type for calculations
     for col in new_columns:
         if col not in export_df.columns:
-            export_df[col] = pd.Series(dtype='float64')  # Use float64 for numeric compatibility
-    
+            # Create empty column with float64 type and fill with NaN
+            export_df[col] = pd.Series(dtype='float64')
+            
     # Reorder columns
     export_df = export_df[new_columns]
     
@@ -678,8 +679,13 @@ def export_excel_with_spacing(
     # Concatenate while preserving numeric types
     export_df = pd.concat([export_df, ponderacio_row], ignore_index=True)
     
-    # Replace NaN with empty string only in non-numeric columns
+    # Convert numeric columns to float64 explicitly
     numeric_cols = export_df.select_dtypes(include=['int64', 'float64']).columns
+    for col in numeric_cols:
+        # Convert to float64 with NaN for missing values
+        export_df[col] = pd.to_numeric(export_df[col], errors='coerce').astype('float64')
+    
+    # Replace NaN with empty string only in non-numeric columns
     non_numeric_cols = export_df.columns.difference(numeric_cols)
     export_df[non_numeric_cols] = export_df[non_numeric_cols].fillna('')
     
