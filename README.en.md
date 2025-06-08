@@ -29,12 +29,16 @@ A Python tool to extract and process grade records from Esfer@'s PDF grade repor
 │   └── .gitkeep              # Keeps directory in git but ignores contents
 ├── output_xlsx_files/        # Directory for output Excel files
 │   └── .gitkeep              # Keeps directory in git but ignores contents
+├── rules/                    # Project configuration rules
+│   └── column-context.md     # Column context rules
 ├── src/                      # Source code package
 │   ├── __init__.py           # Package initialization and exports
 │   ├── pdf_processor.py      # PDF extraction and processing
 │   ├── data_processor.py     # Data cleaning and transformation
 │   ├── grade_processor.py    # Grade-specific operations
 │   └── excel_processor.py    # Excel file generation and formatting
+├── cursor.config.jsonc       # Cursor configuration
+├── windsurf.config.jsonc     # Windsurf configuration
 ├── Dockerfile                # Docker configuration
 ├── README.md                 # Catalan version 
 ├── README.en.md              # This file (English)

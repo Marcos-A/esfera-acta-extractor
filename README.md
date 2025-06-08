@@ -29,12 +29,16 @@ Una eina en Python per extreure i processar els registres de qualificacions de l
 │   └── .gitkeep              # Manté el directori a git però ignora els continguts
 ├── output_xlsx_files/        # Directori per als fitxers Excel de sortida
 │   └── .gitkeep              # Manté el directori a git però ignora els continguts
+├── rules/                    # Regles de configuració del projecte
+│   └── column-context.md     # Regles de context de columnes
 ├── src/                      # Paquet de codi font
 │   ├── __init__.py           # Inicialització del paquet i exports
 │   ├── pdf_processor.py      # Extracció i processament de PDFs
 │   ├── data_processor.py     # Utilitats de processament de dades generals
 │   ├── grade_processor.py    # Lògica específica de qualificacions
 │   └── excel_processor.py    # Generació i formatació d'Excel
+├── cursor.config.jsonc       # Configuració de Cursor
+├── windsurf.config.jsonc     # Configuració de Windsurf
 ├── Dockerfile                # Configuració del contenidor Docker
 ├── README.md                 # Aquest fitxer (català)
 ├── README.en.md              # Versió anglès
