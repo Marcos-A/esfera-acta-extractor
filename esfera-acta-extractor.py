@@ -35,7 +35,7 @@ from src import (
 )
 
 
-def process_pdf(pdf_path: str) -> None:
+def process_pdf(pdf_path: str, include_weighting: bool) -> None:
     """
     Process a single PDF file and generate the corresponding Excel output.
     """
@@ -99,30 +99,29 @@ def process_pdf(pdf_path: str) -> None:
     wide = wide.reset_index()
     
     # 13) Export to Excel with proper spacing between MP groups
-    export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes)
+    export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes, include_weighting=include_weighting)
 
 
 def main() -> None:
     """
-    Process all PDF files in the input directory.
+    Main function to process all PDF files in the input directory.
     """
-    # Create output directory if it doesn't exist
-    os.makedirs('output_xlsx_files', exist_ok=True)
+    INCLUDE_GRADE_WEIGHTING = True  # Default: Off. Set to True to include weighting row.
     
-    # Get all PDF files in the input directory
-    pdf_files = glob.glob('input_pdf_files/*.pdf')
+    # Create output directory if it doesn't exist
+    if not os.path.exists('output_xlsx_files'):
+        os.makedirs('output_xlsx_files')
+        
+    pdf_files = glob.glob(os.path.join('input_pdf_files', '*.pdf'))
     
     if not pdf_files:
-        print("No PDF files found in the input_pdf_files directory.")
+        print("No PDF files found in 'input_pdf_files' directory.")
         return
-    
-    print(f"Found {len(pdf_files)} PDF files to process.")
-    
-    # Process each PDF file
+
     for pdf_file in pdf_files:
         print(f"\nProcessing {pdf_file}...")
         try:
-            process_pdf(pdf_file)
+            process_pdf(pdf_file, include_weighting=INCLUDE_GRADE_WEIGHTING)
             print(f"Successfully processed {pdf_file}")
         except Exception as e:
             print(f"Error processing {pdf_file}: {str(e)}")

@@ -44,7 +44,8 @@ def initialize_grade_weights(df: pd.DataFrame, mp_groups: dict[str, list[str]], 
 def apply_row_formatting(
     workbook_path: str,
     mp_codes_with_em: list[str],
-    mp_codes: list[str]
+    mp_codes: list[str],
+    include_weighting: bool
 ) -> None:
     """
     Apply formatting to the percentage row:
@@ -133,9 +134,13 @@ def apply_row_formatting(
     # Make first column header uppercase
     ws['A1'].value = str(ws['A1'].value).upper()
     
-    # Set row height for all rows except the header (which was already set)
-    for row in range(2, last_row + 1):
+    # Set row height for student data rows (all rows except header and potentially the last row)
+    for row in range(2, last_row):
         ws.row_dimensions[row].height = STANDARD_ROW_HEIGHT
+    
+    # Set height for the last row (PONDERACIÓ) only if it's being included and needs the standard height
+    if include_weighting and last_row >= 2: # Ensure last_row is at least 2 to avoid issues with very small sheets
+        ws.row_dimensions[last_row].height = STANDARD_ROW_HEIGHT
     
     # Set increased height for header row to accommodate wrapped RA headers
     ws.row_dimensions[1].height = 45  # Header row needs more height for wrapped RA codes
@@ -255,7 +260,8 @@ def apply_conditional_formatting(
     workbook_path: str,
     mp_groups: dict[str, list[str]],
     mp_codes_with_em: list[str],
-    mp_codes: list[str]
+    mp_codes: list[str],
+    include_weighting: bool
 ) -> None:
     """
     Apply conditional formatting rules to highlight:
@@ -327,22 +333,23 @@ def apply_conditional_formatting(
                     )
                     ws.conditional_formatting.add(cell_range, less_than_five_rule)
                 
-                # Add red background rule for blank percentage cell in last row
-                cell_range = f'{col}{last_row}'
-                blank_rule = FormulaRule(
-                    formula=[f'ISBLANK({cell_range})'],
-                    stopIfTrue=True,
-                    fill=red_fill
-                )
-                ws.conditional_formatting.add(cell_range, blank_rule)
-                
-                # Add red text rule for 0% in last row
-                zero_percent_rule = FormulaRule(
-                    formula=[f'{cell_range}=0'],
-                    stopIfTrue=True,
-                    font=red_font
-                )
-                ws.conditional_formatting.add(cell_range, zero_percent_rule)
+                if include_weighting:
+                    # Add red background rule for blank percentage cell in last row
+                    cell_range_last_row_ra = f'{col}{last_row}'
+                    blank_rule = FormulaRule(
+                        formula=[f'ISBLANK({cell_range_last_row_ra})'],
+                        stopIfTrue=True,
+                        fill=red_fill
+                    )
+                    ws.conditional_formatting.add(cell_range_last_row_ra, blank_rule)
+                    
+                    # Add red text rule for 0% in last row
+                    zero_percent_rule = FormulaRule(
+                        formula=[f'{cell_range_last_row_ra}=0'],
+                        stopIfTrue=True,
+                        font=red_font
+                    )
+                    ws.conditional_formatting.add(cell_range_last_row_ra, zero_percent_rule)
     
     # Add red text rules for error messages in MP CENTRE and MP columns
     for mp_code in mp_codes:
@@ -360,15 +367,16 @@ def apply_conditional_formatting(
                     )
                     ws.conditional_formatting.add(cell_range, error_rule)
                 
-                # Red text if not 90% in last row
-                cell_range = f'{centre_col}{last_row}'
-                rule = CellIsRule(
-                    operator='notEqual',
-                    formula=['0.9'],  # 90%
-                    stopIfTrue=True,
-                    font=red_font
-                )
-                ws.conditional_formatting.add(cell_range, rule)
+                if include_weighting:
+                    # Red text if not 90% in last row
+                    cell_range_last_row_centre = f'{centre_col}{last_row}'
+                    rule = CellIsRule(
+                        operator='notEqual',
+                        formula=['0.9'],  # 90%
+                        stopIfTrue=True,
+                        font=red_font
+                    )
+                    ws.conditional_formatting.add(cell_range_last_row_centre, rule)
         
         # For both Type A and B MPs
         mp_col = get_column_for_header(mp_code)
@@ -389,15 +397,16 @@ def apply_conditional_formatting(
                 )
                 ws.conditional_formatting.add(cell_range, error_rule)
             
-            # Red text if not 100% in last row
-            cell_range = f'{mp_col}{last_row}'
-            rule = CellIsRule(
-                operator='notEqual',
-                formula=['1'],  # 100%
-                stopIfTrue=True,
-                font=red_font
-            )
-            ws.conditional_formatting.add(cell_range, rule)
+            if include_weighting:
+                # Red text if not 100% in last row
+                cell_range_last_row_mp = f'{mp_col}{last_row}'
+                rule = CellIsRule(
+                    operator='notEqual',
+                    formula=['1'],  # 100%
+                    stopIfTrue=True,
+                    font=red_font
+                )
+                ws.conditional_formatting.add(cell_range_last_row_mp, rule)
     
     wb.save(workbook_path)
 
@@ -465,7 +474,8 @@ def apply_mp_sum_formulas(
     workbook_path: str,
     mp_groups: dict[str, list[str]],
     mp_codes_with_em: list[str],
-    mp_codes: list[str]
+    mp_codes: list[str],
+    include_weighting: bool
 ) -> None:
     """
     Apply Excel formulas to calculate MP sums in the last row and SUMPRODUCT for student grades.
@@ -489,6 +499,7 @@ def apply_mp_sum_formulas(
         mp_groups: Dictionary mapping MP codes to their RA codes
         mp_codes_with_em: List of MP codes that have EM entries
         mp_codes: List of all MP codes
+        include_weighting: Boolean to control inclusion of weighting logic
     """
     wb = load_workbook(workbook_path)
     ws = wb.active
@@ -496,117 +507,116 @@ def apply_mp_sum_formulas(
     
     # Helper function to get column letter
     def get_column_for_header(header: str) -> str:
+        # Ensure header is a string before attempting string operations
+        header_str = str(header) if header is not None else ""
         for cell in ws[1]:  # First row
             if cell.value:
-                cell_value = str(cell.value).replace('\n', '')
-                header_clean = header.replace('\n', '')
-                if cell_value == header_clean:
+                # Ensure cell.value is a string before attempting string operations
+                cell_value_str = str(cell.value) if cell.value is not None else ""
+                # Replace both \n and \r (Windows newline)
+                cell_value_clean = cell_value_str.replace('\n', '').replace('\r', '')
+                header_clean = header_str.replace('\n', '').replace('\r', '')
+                if cell_value_clean == header_clean:
                     return get_column_letter(cell.column)
         return None
     
     # For each MP, create appropriate formulas
     for mp_code in mp_codes:
-        # Get RA codes for this MP
-        ra_codes = mp_groups[mp_code]
-        
-        # Get the column letters for each RA
+        ra_codes = mp_groups.get(mp_code, []) # Use .get for safety
         ra_columns = [get_column_for_header(ra) for ra in ra_codes]
         ra_columns = [col for col in ra_columns if col is not None]
         
         if ra_columns:
-            # Get first and last RA columns for range references
             first_ra_col = ra_columns[0]
             last_ra_col = ra_columns[-1]
             
-            # Create the failing grades check
-            failing_grades_check = []
+            failing_grades_check_parts = []
             for ra_col in ra_columns:
-                failing_grades_check.append(f'AND(ISNUMBER({ra_col}{{row}}),{ra_col}{{row}}<5)')
-            any_failing = f'OR({",".join(failing_grades_check)})'
+                failing_grades_check_parts.append(f'AND(ISNUMBER({ra_col}{{row}}),{ra_col}{{row}}<5)')
+            any_failing = f'OR({",".join(failing_grades_check_parts)})'
             
             if mp_code in mp_codes_with_em:
-                # For MPs with EM:
-                # 1. CENTRE column gets the SUMPRODUCT formula with validation
                 centre_column = get_column_for_header(f'{mp_code} CENTRE')
-                if centre_column:
-                    # Apply formula to each student row
-                    for row in range(2, last_row):  # Skip header and percentage row
-                        cell = ws[f'{centre_column}{row}']
-                        # Create formula that checks percentages, failing grades, and valid numbers
-                        cell.value = (
-                            f'=IF(SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})<>0.9,'
-                            f'"ELS RA HAN DE SUMAR 90%",'
-                            f'IF({any_failing.format(row=row)},'
-                            f'"NO SUPERAT",'
-                            f'IF(COUNT({first_ra_col}{row}:{last_ra_col}{row})=COLUMNS({first_ra_col}{row}:{last_ra_col}{row}),'
-                            f'SUMPRODUCT({first_ra_col}{row}:{last_ra_col}{row},'
-                            f'{first_ra_col}{last_row}:{last_ra_col}{last_row}),'
-                            f'"AVALUACIONS PENDENTS")))'
-                        )
-                    
-                    # Set percentage for CENTRE column (sum of RA percentages)
-                    cell = ws[f'{centre_column}{last_row}']
-                    cell.value = f'=SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})'
-                    cell.number_format = '0%'
-                
-                # 2. EMPRESA column is set to 10%
                 empresa_column = get_column_for_header(f'{mp_code} EMPRESA')
-                if empresa_column:
+                mp_column_em = get_column_for_header(mp_code) # Renamed to avoid conflict
+
+                if centre_column:
+                    for row_idx in range(2, last_row): # Student rows
+                        cell = ws[f'{centre_column}{row_idx}']
+                        if include_weighting:
+                            cell.value = (
+                                f'=IF(SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})<>0.9,'
+                                f'"ELS RA HAN DE SUMAR 90%",'
+                                f'IF({any_failing.format(row=row_idx)},'
+                                f'"NO SUPERAT",'
+                                f'IF(COUNT({first_ra_col}{row_idx}:{last_ra_col}{row_idx})=COLUMNS({first_ra_col}{row_idx}:{last_ra_col}{row_idx}),'
+                                f'SUMPRODUCT({first_ra_col}{row_idx}:{last_ra_col}{row_idx},'
+                                f'{first_ra_col}{last_row}:{last_ra_col}{last_row}),'
+                                f'"AVALUACIONS PENDENTS")))'
+                            )
+                        else:
+                            cell.value = None
+                    
+                    if include_weighting and last_row >=1 : # Last row (weighting)
+                        cell = ws[f'{centre_column}{last_row}']
+                        cell.value = f'=SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})'
+                        cell.number_format = '0%'
+                
+                if empresa_column and include_weighting and last_row >=1: # Last row (weighting)
                     cell = ws[f'{empresa_column}{last_row}']
                     cell.value = 0.1  # 10%
                     cell.number_format = '0%'
                 
-                # 3. MP column uses SUMPRODUCT between CENTRE and EMPRESA columns, rounded to integer
-                mp_column = get_column_for_header(mp_code)
-                if mp_column and centre_column and empresa_column:
-                    # For each student row
-                    for row in range(2, last_row):  # Skip header and percentage row
-                        cell = ws[f'{mp_column}{row}']
-                        # Create SUMPRODUCT formula for CENTRE and EMPRESA, with rounding
-                        cell.value = (
-                            f'=IF(AND(NOT(ISTEXT({centre_column}{row})),NOT(ISTEXT({empresa_column}{row}))),'
-                            f'ROUND(SUMPRODUCT('
-                            f'CHOOSE({{1,2}},{centre_column}{row},{empresa_column}{row}),'
-                            f'CHOOSE({{1,2}},{centre_column}{last_row},{empresa_column}{last_row})'
-                            f'),0), "AVALUACIONS PENDENTS")'
-                        )
-                    
-                    # Set percentage for MP column (should sum to 100%)
-                    cell = ws[f'{mp_column}{last_row}']
-                    cell.value = f'={centre_column}{last_row}+{empresa_column}{last_row}'
-                    cell.number_format = '0%'
-            else:
-                # For regular MPs:
-                # MP column gets the SUMPRODUCT formula with validation, rounded to integer
-                mp_column = get_column_for_header(mp_code)
-                if mp_column:
-                    # Apply formula to each student row
-                    for row in range(2, last_row):  # Skip header and percentage row
-                        cell = ws[f'{mp_column}{row}']
-                        # Create formula that checks percentages, failing grades, and valid numbers
-                        cell.value = (
-                            f'=IF(SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})<>1,'
-                            f'"ELS RA HAN DE SUMAR 100%",'
-                            f'IF({any_failing.format(row=row)},'
-                            f'"NO SUPERAT",'
-                            f'IF(COUNT({first_ra_col}{row}:{last_ra_col}{row})=COLUMNS({first_ra_col}{row}:{last_ra_col}{row}),'
-                            f'ROUND(SUMPRODUCT({first_ra_col}{row}:{last_ra_col}{row},'
-                            f'{first_ra_col}{last_row}:{last_ra_col}{last_row}),0),'
-                            f'"AVALUACIONS PENDENTS")))'
-                        )
-                    
-                    # Set percentage for MP column (should sum to 100%)
-                    cell = ws[f'{mp_column}{last_row}']
-                    cell.value = f'=SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})'
-                    cell.number_format = '0%'
+                if mp_column_em and centre_column and empresa_column: # Ensure all columns found
+                    for row_idx in range(2, last_row): # Student rows
+                        cell = ws[f'{mp_column_em}{row_idx}']
+                        if include_weighting:
+                            cell.value = (
+                                f'=IF(AND(NOT(ISTEXT({centre_column}{row_idx})),NOT(ISTEXT({empresa_column}{row_idx})),ISNUMBER({centre_column}{last_row}),ISNUMBER({empresa_column}{last_row})),' # Check if weights are numbers
+                                f'ROUND(SUMPRODUCT('
+                                f'CHOOSE({{1,2}},{centre_column}{row_idx},{empresa_column}{row_idx}),'
+                                f'CHOOSE({{1,2}},{centre_column}{last_row},{empresa_column}{last_row})'
+                                f'),0), "AVALUACIONS PENDENTS")'
+                            )
+                        else:
+                            cell.value = None
+                            
+                    if include_weighting and last_row >=1: # Last row (weighting)
+                        cell = ws[f'{mp_column_em}{last_row}']
+                        cell.value = f'={centre_column}{last_row}+{empresa_column}{last_row}'
+                        cell.number_format = '0%'
+            else: # Regular MPs (Type B)
+                mp_column_regular = get_column_for_header(mp_code) # Renamed to avoid conflict
+                if mp_column_regular:
+                    for row_idx in range(2, last_row): # Student rows
+                        cell = ws[f'{mp_column_regular}{row_idx}']
+                        if include_weighting:
+                            cell.value = (
+                                f'=IF(SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})<>1,'
+                                f'"ELS RA HAN DE SUMAR 100%",'
+                                f'IF({any_failing.format(row=row_idx)},'
+                                f'"NO SUPERAT",'
+                                f'IF(COUNT({first_ra_col}{row_idx}:{last_ra_col}{row_idx})=COLUMNS({first_ra_col}{row_idx}:{last_ra_col}{row_idx}),'
+                                f'ROUND(SUMPRODUCT({first_ra_col}{row_idx}:{last_ra_col}{row_idx},'
+                                f'{first_ra_col}{last_row}:{last_ra_col}{last_row}),0),'
+                                f'"AVALUACIONS PENDENTS")))'
+                            )
+                        else:
+                            cell.value = None
+
+                    if include_weighting and last_row >=1: # Last row (weighting)
+                        cell = ws[f'{mp_column_regular}{last_row}']
+                        cell.value = f'=SUM({first_ra_col}{last_row}:{last_ra_col}{last_row})'
+                        cell.number_format = '0%'
     
-    # Format all RA cells in the last row as percentages
-    for mp_code in mp_codes:
-        for ra in mp_groups[mp_code]:
-            col = get_column_for_header(ra)
-            if col:
-                cell = ws[f'{col}{last_row}']
-                cell.number_format = '0%'
+    if include_weighting and last_row >=1:
+        # Format all RA cells in the last row as percentages
+        for mp_code_outer in mp_codes: 
+            for ra_outer in mp_groups.get(mp_code_outer, []): # Use .get for safety
+                col_outer = get_column_for_header(ra_outer)
+                if col_outer:
+                    cell = ws[f'{col_outer}{last_row}']
+                    cell.number_format = '0%'
     
     wb.save(workbook_path)
 
@@ -615,7 +625,8 @@ def apply_cell_protection(
     workbook_path: str,
     mp_codes_with_em: list[str],
     mp_codes: list[str],
-    mp_groups: dict[str, list[str]]
+    mp_groups: dict[str, list[str]],
+    include_weighting: bool
 ) -> None:
     """
     Apply cell protection to Excel file:
@@ -623,24 +634,29 @@ def apply_cell_protection(
     - Use password "edita'm" for protection
     - Allow editing only for RA percentage cells
     """
+    if not include_weighting:
+        return
+
     wb = load_workbook(workbook_path)
     ws = wb.active
     last_row = ws.max_row
-    
+
     # Lock all cells first
     for row in ws.iter_rows():
         for cell in row:
             cell.protection = Protection(locked=True)
-    
+
     # Helper function to find column letter for a header
     def get_column_for_header(header: str) -> str:
-        for cell in ws[1]:  # First row
-            if cell.value:
-                # Remove any line breaks from both the cell value and the header for comparison
-                cell_value = str(cell.value).replace('\n', '')
-                header_clean = header.replace('\n', '')
-                if cell_value == header_clean:
-                    return get_column_letter(cell.column)
+        header_str = str(header) if header is not None else ""
+        for cell_obj in ws[1]:  # First row
+            if cell_obj.value:
+                cell_value_str = str(cell_obj.value) if cell_obj.value is not None else ""
+                # Robust cleaning for cell value and header
+                cell_value_clean = cell_value_str.replace('\n', '').replace('\r', '')
+                header_clean = header_str.replace('\n', '').replace('\r', '')
+                if cell_value_clean == header_clean:
+                    return get_column_letter(cell_obj.column)
         return None
 
     # Unlock only RA grade columns in last row
@@ -649,13 +665,13 @@ def apply_cell_protection(
         for ra in mp_groups[mp_code]:
             col = get_column_for_header(ra)
             if col:
-                cell = ws[f'{col}{last_row}']
-                cell.protection = Protection(locked=False)
-    
+                cell_to_unlock = ws[f'{col}{last_row}']
+                cell_to_unlock.protection = Protection(locked=False)
+
     # Protect the sheet with password
     ws.protection.sheet = True
     ws.protection.password = "edita'm"
-    
+
     wb.save(workbook_path)
 
 
@@ -663,7 +679,8 @@ def export_excel_with_spacing(
     df: pd.DataFrame,
     output_path: str,
     mp_codes_with_em: list[str],
-    mp_codes: list[str]
+    mp_codes: list[str],
+    include_weighting: bool
 ) -> None:
     """
     Export DataFrame to Excel with specific column spacing after each MP's RAs.
@@ -679,14 +696,22 @@ def export_excel_with_spacing(
     # Get the current column order (excluding 'estudiant')
     ra_codes = [col for col in df.columns if col != 'estudiant']
     
-    # Group RA codes by their MP using existing mp_codes
-    mp_groups = {mp: [] for mp in mp_codes}  # Initialize with known MPs
+    # Group RA codes by their MP. Sort mp_codes by length descending to match longer MPs first (e.g., MP10 before MP1).
+    # Use startswith(mp_code + '_') for more precise matching.
+    mp_groups = {mp: [] for mp in mp_codes}
+    sorted_mp_codes = sorted(mp_codes, key=len, reverse=True) # Sort MPs
+
     for ra_code in ra_codes:
-        # Find which MP this RA belongs to
-        for mp_code in mp_codes:
-            if ra_code.startswith(mp_code):
+        found_mp = False
+        for mp_code in sorted_mp_codes:
+            if ra_code.startswith(mp_code + '_'): # Precise matching
                 mp_groups[mp_code].append(ra_code)
+                found_mp = True
                 break
+        if not found_mp:
+            # This case should ideally not happen if RAs are well-named (e.g. MPXX_RAX)
+            # Consider logging a warning or handling as an error if an RA doesn't match any MP
+            print(f"Warning: RA code '{ra_code}' did not match any known MP code prefix.")
     
     # Add empty spacing columns with explicit numeric type for calculations
     new_columns = ['estudiant']  # Start with student name column
@@ -705,22 +730,20 @@ def export_excel_with_spacing(
         else:
             new_columns.append(f'{mp_code}')
     
-    # Create DataFrame with proper column order
-    export_df = pd.DataFrame(columns=new_columns)
-    export_df['estudiant'] = df['estudiant']
+    # Start with a copy of the original DataFrame's data for existing columns
+    export_df = df.copy()
+
+    # Add new placeholder columns (MP, CENTRE, EMPRESA) if they don't exist
+    # These are the columns present in new_columns but not in original df
+    for col_name in new_columns:
+        if col_name not in export_df.columns:
+            export_df[col_name] = pd.Series(dtype='float64', index=export_df.index) # Ensure correct index
+
+    # Ensure all columns from new_columns are present and in the correct order
+    # This also handles the case where some RA columns might not have been in the initial df
+    # (though current logic implies df contains all ra_codes)
+    export_df = export_df.reindex(columns=new_columns)
     
-    # Add RA columns with their values, preserving numeric types
-    for col in ra_codes:
-        export_df[col] = df[col]
-    
-    # Add empty spacing columns with explicit numeric type for calculations
-    for col in new_columns:
-        if col not in export_df.columns:
-            # Create empty column with float64 type and fill with NaN
-            export_df[col] = pd.Series(dtype='float64')
-    
-    # Reorder columns
-    export_df = export_df[new_columns]
     
     # Initialize percentages for the last row (RA columns and EM columns)
     percentages = initialize_grade_weights(export_df, mp_groups, mp_codes_with_em)
@@ -729,10 +752,8 @@ def export_excel_with_spacing(
     ponderacio_row = pd.DataFrame([percentages], columns=new_columns)
     ponderacio_row.iloc[0, 0] = 'PONDERACIÓ (%)'
     
-    # Filter out empty or all-NA columns before concatenation
-    non_empty_columns = [col for col in new_columns if not export_df[col].isna().all()]
-    export_df = export_df[non_empty_columns]
-    ponderacio_row = ponderacio_row[non_empty_columns]
+    # export_df and ponderacio_row are already aligned with new_columns.
+    # No explicit filtering here is needed as subsequent steps handle NaNs.
     
     # Concatenate while preserving numeric types
     export_df = pd.concat([export_df, ponderacio_row], ignore_index=True)
@@ -752,109 +773,34 @@ def export_excel_with_spacing(
     export_df.to_excel(output_path, index=False)
     
     # Apply Excel formulas for MP sums
-    apply_mp_sum_formulas(output_path, mp_groups, mp_codes_with_em, mp_codes)
+    apply_mp_sum_formulas(output_path, mp_groups, mp_codes_with_em, mp_codes, include_weighting)
     
     # Apply row formatting (borders, bold, background colors)
-    apply_row_formatting(output_path, mp_codes_with_em, mp_codes)
+    apply_row_formatting(output_path, mp_codes_with_em, mp_codes, include_weighting)
     
     # Apply data validation for percentage cells
     apply_data_validation(output_path, mp_groups, mp_codes)
     
     # Apply conditional formatting (now without percentage validation)
-    apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes)
+    apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes, include_weighting)
+    
+    #print(f"\t- Exported {len(export_df)-1} entries to {output_path}")
+    
+    # Apply cell protection
+    apply_cell_protection(output_path, mp_codes_with_em, mp_codes, mp_groups, include_weighting)
+
+    # If include_weighting is False, remove the last row (ponderacio row) from the Excel file
+    if not include_weighting:
+        wb = load_workbook(output_path)
+        ws = wb.active
+        if ws.max_row > 0: # Check if there are any rows to delete
+            # Check if the first cell of the last row contains 'PONDERACIÓ (%)'
+            # This is a safeguard to ensure we are deleting the correct row.
+            if ws.cell(row=ws.max_row, column=1).value == 'PONDERACIÓ (%)':
+                 ws.delete_rows(ws.max_row)
+                 # print(f"\t- Removed 'PONDERACIÓ (%)' row as per include_weighting=False.") # Optional: uncomment for logging
+            # else:
+                # print(f"\t- Warning: Last row was not 'PONDERACIÓ (%)'. Did not remove last row.") # Optional: uncomment for logging
+        wb.save(output_path)
     
     print(f"\t- Exported {len(export_df)-1} entries to {output_path}")
-    
-    # Apply cell protection
-    apply_cell_protection(output_path, mp_codes_with_em, mp_codes, mp_groups)
-    """
-    Export DataFrame to Excel with specific column spacing after each MP's RAs.
-    - 3 empty columns after MPs with EM (named: MP CENTRE, MP EMPRESA, MP)
-    - 1 empty column after other MPs (named: MP)
-    - Adds a "PONDERACIÓ (%)" row after student entries with percentage calculations
-    - Uses Excel formulas to dynamically sum RA percentages for each MP
-    - Applies data validation for percentage cells
-    - Applies conditional formatting for invalid grades
-    - Protects all cells except RA percentage cells
-    Uses pre-computed mp_codes list for efficient grouping.
-    """
-    # Get the current column order (excluding 'estudiant')
-    ra_codes = [col for col in df.columns if col != 'estudiant']
-    
-    # Group RA codes by their MP using existing mp_codes
-    mp_groups = {mp: [] for mp in mp_codes}  # Initialize with known MPs
-    for ra_code in ra_codes:
-        # Find which MP this RA belongs to
-        mp_code = next(mp for mp in mp_codes if ra_code.startswith(mp + '_'))
-        mp_groups[mp_code].append(ra_code)
-    
-    # Create new column order with spacing
-    new_columns = ['estudiant']
-    for mp_code in mp_codes:  # Use mp_codes to maintain consistent order
-        # Add all RA codes for this MP
-        new_columns.extend(mp_groups[mp_code])
-        # Add empty columns with specific names based on whether MP has EM
-        if mp_code in mp_codes_with_em:
-            new_columns.extend([
-                f'{mp_code} CENTRE',
-                f'{mp_code} EMPRESA',
-                f'{mp_code}'
-            ])
-        else:
-            new_columns.append(f'{mp_code}')
-    
-    # Create new DataFrame with the desired column order
-    export_df = pd.DataFrame(index=df.index)
-    export_df['estudiant'] = df['estudiant']
-    
-    # Add RA columns with their values, preserving numeric types
-    for col in ra_codes:
-        export_df[col] = df[col]
-    
-    # Add empty spacing columns with explicit numeric type for calculations
-    for col in new_columns:
-        if col not in export_df.columns:
-            # Create empty column with float64 type and fill with NaN
-            export_df[col] = pd.Series(dtype='float64')
-            
-    # Reorder columns
-    export_df = export_df[new_columns]
-    
-    # Initialize percentages for the last row (RA columns and EM columns)
-    percentages = initialize_grade_weights(export_df, mp_groups, mp_codes_with_em)
-    
-    # Add "PONDERACIÓ (%)" row with initial percentages
-    ponderacio_row = pd.DataFrame([percentages], columns=new_columns)
-    ponderacio_row.iloc[0, 0] = 'PONDERACIÓ (%)'
-    
-    # Concatenate while preserving numeric types
-    export_df = pd.concat([export_df, ponderacio_row], ignore_index=True)
-    
-    # Convert numeric columns to float64 explicitly
-    numeric_cols = export_df.select_dtypes(include=['int64', 'float64']).columns
-    for col in numeric_cols:
-        # Convert to float64 with NaN for missing values
-        export_df[col] = pd.to_numeric(export_df[col], errors='coerce').astype('float64')
-    
-    # Replace NaN with empty string only in non-numeric columns
-    non_numeric_cols = export_df.columns.difference(numeric_cols)
-    export_df[non_numeric_cols] = export_df[non_numeric_cols].fillna('')
-    
-    # Export to Excel
-    output_path = output_path.replace('.csv', '.xlsx')
-    export_df.to_excel(output_path, index=False)
-    
-    # Apply Excel formulas for MP sums
-    apply_mp_sum_formulas(output_path, mp_groups, mp_codes_with_em, mp_codes)
-    
-    # Apply row formatting (borders, bold, background colors)
-    apply_row_formatting(output_path, mp_codes_with_em, mp_codes)
-    
-    # Apply data validation for percentage cells
-    apply_data_validation(output_path, mp_groups, mp_codes)
-    
-    # Apply conditional formatting (now without percentage validation)
-    apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes)
-        
-    # Apply cell protection
-    apply_cell_protection(output_path, mp_codes_with_em, mp_codes, mp_groups)

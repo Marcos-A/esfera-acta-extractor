@@ -58,7 +58,7 @@ output_xlsx_files/*
 # But keep requirements.txt
 !requirements.txt
 
-# Local code editor overrides
+# Local config editor overrides
 cursor.local.json
 cursor.local.jsonc
 windsurf.local.json
