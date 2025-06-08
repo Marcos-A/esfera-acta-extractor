@@ -2,18 +2,31 @@
 
 # Esfer@ Acta Extractor
 
-A Python tool to extract and process grade records from Esfer@'s PDF grade reports. The tool parses PDF tables, processes student grades, and generates an Excel file with a structured view of RA (Learning Achievement) grades and MP (Professional Module) qualifications.
+A Python tool to extract and process grade records from Esfer@'s PDF grade reports. The tool parses PDF tables, processes student grades, and generates two types of Excel files:
+1. A detailed file with all RA (Learning Achievement) and MP (Professional Module) grades.
+2. A summary report for each MP with student grades and a clear results overview.
 
 ## Features
 
-- Extracts tables from PDF grade reports
-- Processes student names and grades
-- Identifies MPs with EM (Workplace Training) entries
-- Generates Excel files with:
-  - Student grades for each RA
-  - Properly spaced columns for MP qualifications
-  - Special column layout for MPs with EM entries
-  - Cell protection: All cells are locked except RA percentage cells in the last row. Use password "edita'm" to unlock.
+### PDF Processing
+- Automatic extraction of grade reports from PDF files
+- Intelligent processing of student names and grades
+- Automatic identification of MPs with Workplace Training (EM) hours
+
+### Detailed Excel File
+- Comprehensive view of all RA and MP grades
+- Clear organization by student and MP
+- Conditional formatting for better visualization
+- Cell protection with password "edita'm"
+- Built-in formulas for automatic calculations
+
+### Grade Summary
+- Consolidated view of grades for each MP
+- Different number formats for Type A (2 decimals) and Type B (integer) MPs
+- Built-in legend explaining MP types
+- Alternating row colors for better readability
+- Data validation to ensure correct values
+- Professional formatting ready for printing
 
 ## Requirements
 
@@ -25,10 +38,12 @@ A Python tool to extract and process grade records from Esfer@'s PDF grade repor
 
 ```
 .
-├── input_pdf_files/          # Directory for input PDF files
-│   └── .gitkeep              # Keeps directory in git but ignores contents
-├── output_xlsx_files/        # Directory for output Excel files
-│   └── .gitkeep              # Keeps directory in git but ignores contents
+├── 01_source_pdfs/           # Directory for input PDF files
+│   └── .gitkeep              # Keeps directory in Git but ignores contents
+├── 02_extracted_data/        # Directory for output Excel files
+│   └── .gitkeep              # Keeps directory in Git but ignores contents
+├── 03_final_grade_summaries/ # Directory for final grade summaries
+│   └── .gitkeep              # Keeps directory in Git but ignores contents
 ├── rules/                    # Project configuration rules
 │   └── column-context.md     # Column context rules
 ├── src/                      # Source code package
@@ -36,7 +51,8 @@ A Python tool to extract and process grade records from Esfer@'s PDF grade repor
 │   ├── pdf_processor.py      # PDF extraction and processing
 │   ├── data_processor.py     # Data cleaning and transformation
 │   ├── grade_processor.py    # Grade-specific operations
-│   └── excel_processor.py    # Excel file generation and formatting
+│   ├── excel_processor.py    # Excel file generation and formatting
+│   └── summary_generator.py  # Grade summary report generation
 ├── cursor.config.jsonc       # Cursor configuration
 ├── windsurf.config.jsonc     # Windsurf configuration
 ├── Dockerfile                # Docker configuration
@@ -68,7 +84,13 @@ A Python tool to extract and process grade records from Esfer@'s PDF grade repor
 - **excel_processor.py**: Excel file handling
   - Excel file generation
   - Column spacing and organization
-  - (Future) Formatting and formulas
+  - Formatting and formulas
+
+- **summary_generator.py**: Grade summary report generation
+  - Creates MP qualification summaries
+  - Includes RA codes and student grades
+  - Applies conditional formatting for better readability
+  - Generates explanatory legend for MP types
 
 ## Installation & Usage
 
@@ -105,9 +127,9 @@ docker build -t esfera-acta-extractor .
    ```
 
 **Note**: The script will:
-- Look for PDF files in the `input_pdf_files` directory
+- Look for PDF files in the `01_source_pdfs` directory
 - Process each PDF file individually
-- Generate Excel output files in the `output_xlsx_files` directory
+- Generate Excel output files in the `02_extracted_data` directory
 - Name each output file based on the group code found in its corresponding PDF
 - Skip any files that are not PDFs or cannot be processed
 - Continue processing remaining files even if some fail

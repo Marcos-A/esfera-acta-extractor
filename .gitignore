@@ -43,10 +43,12 @@ original_pdf_files/
 
 # Ignore contents of input and output directories
 ##############################
-input_pdf_files/*
-!input_pdf_files/.gitkeep
-output_xlsx_files/*
-!output_xlsx_files/.gitkeep
+01_source_pdfs/*
+!01_source_pdfs/.gitkeep
+02_extracted_data/*
+!02_extracted_data/.gitkeep
+03_final_grade_summaries/*
+!03_final_grade_summaries/.gitkeep
 
 # Ignore other file types
 ##############################

@@ -33,6 +33,8 @@ from src import (
     sort_records,
     export_excel_with_spacing
 )
+from src.excel_processor import export_excel_with_spacing
+import glob
 
 
 def process_pdf(pdf_path: str, include_weighting: bool) -> None:
@@ -41,7 +43,7 @@ def process_pdf(pdf_path: str, include_weighting: bool) -> None:
     """
     # Extract group code for filename
     group_code = extract_group_code(pdf_path)
-    output_xlsx = os.path.join('output_xlsx_files', f'{group_code}.xlsx')
+    output_xlsx = os.path.join('02_extracted_data', f'{group_code}.xlsx')
     
     # 1) Extract tables
     tables = extract_tables(pdf_path)
@@ -68,7 +70,7 @@ def process_pdf(pdf_path: str, include_weighting: bool) -> None:
     # 9) Extract RA records using original entry_pattern
     ra_entry_pattern = re.compile(
         r"""
-        (?P<code>[A-Za-z0-9]{4,}                # MP code format
+        (?P<code>[A-Za-z0-9]{3,5}               # MP code format
         _               
         [A-Za-z0-9]{4,5}                        # CF code format
         _                       
@@ -106,26 +108,54 @@ def main() -> None:
     """
     Main function to process all PDF files in the input directory.
     """
-    INCLUDE_GRADE_WEIGHTING = True  # Default: Off. Set to True to include weighting row.
+    INCLUDE_GRADE_WEIGHTING = False  # Default: Off. Set to True to include weighting row.
     
     # Create output directory if it doesn't exist
-    if not os.path.exists('output_xlsx_files'):
-        os.makedirs('output_xlsx_files')
+    if not os.path.exists('02_extracted_data'):
+        os.makedirs('02_extracted_data')
         
-    pdf_files = glob.glob(os.path.join('input_pdf_files', '*.pdf'))
+    pdf_files = glob.glob(os.path.join('01_source_pdfs', '*.pdf'))
     
     if not pdf_files:
-        print("No PDF files found in 'input_pdf_files' directory.")
+        print("No PDF files found in '01_source_pdfs' directory.")
         return
 
     for pdf_file in pdf_files:
-        print(f"\nProcessing {pdf_file}...")
+        print(f"\Extracting data from {pdf_file}...")
         try:
             process_pdf(pdf_file, include_weighting=INCLUDE_GRADE_WEIGHTING)
-            print(f"Successfully processed {pdf_file}")
+            print(f"\t- Successfully extracted data from {pdf_file}")
         except Exception as e:
-            print(f"Error processing {pdf_file}: {str(e)}")
+            print(f"ERROR processing {pdf_file}: {str(e)}")
 
+
+    # After processing all PDFs, generate summary reports
+    summary_output_dir = '03_final_grade_summaries'
+    if not os.path.exists(summary_output_dir):
+        os.makedirs(summary_output_dir)
+
+    # Get all xlsx files from the '02_extracted_data' directory
+    source_files_pattern = os.path.join('02_extracted_data', '*.xlsx')
+    all_potential_source_files = glob.glob(source_files_pattern)
+    
+    # Filter out temporary/owner files (starting with ~$)
+    actual_source_xlsx_files = [f for f in all_potential_source_files if not os.path.basename(f).startswith('~$')]
+
+    if not actual_source_xlsx_files:
+        print("No valid processed XLSX files found in '02_extracted_data' to summarize.")
+    else:
+        print("\nGenerating summary reports...")
+        # Import here to avoid circular dependency if summary_generator grows
+        from src.summary_generator import generate_summary_report 
+        for source_xlsx_file in actual_source_xlsx_files:
+            summary_file_name = f"qualificacions_MP-{os.path.basename(source_xlsx_file)}"
+            # summary_output_dir is '03_final_grade_summaries', defined above
+            output_summary_path = os.path.join(summary_output_dir, summary_file_name)
+            try:
+                generate_summary_report(source_xlsx_file, output_summary_path, include_weighting=INCLUDE_GRADE_WEIGHTING)
+                print(f"\t- Successfully generated summary: {output_summary_path}")
+            except Exception as e:
+                print(f"ERROR generating summary for {source_xlsx_file}: {str(e)}")
 
 if __name__ == '__main__':
     main()

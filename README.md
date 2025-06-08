@@ -2,18 +2,31 @@
 
 # Esfer@ Acta Extractor
 
-Una eina en Python per extreure i processar els registres de qualificacions de les actes de notes en PDF d’Esfer@. L’eina extreu les taules dels PDF, processa les notes dels estudiants i genera un fitxer Excel amb una vista estructurada de les qualificacions de RA (Resultats d’Aprenentatge) i de les qualificacions de MP (Mòdul Professional).
+Una eina en Python per extreure i processar els registres de qualificacions de les actes de notes en PDF d'Esfer@. L'eina extreu les taules dels PDF, processa les notes dels estudiants i genera dos tipus de fitxers Excel:
+1. Un fitxer detallat amb totes les qualificacions de RA (Resultats d'Aprenentatge) i MP (Mòdul Professional).
+2. Un resum de qualificacions per a cada MP amb les notes dels estudiants i una vista clara dels resultats.
 
 ## Característiques
 
-- Extreu taules dels informes de les actes de notes en PDF  
-- Processa els noms i les notes dels estudiants  
-- Identifica els MP amb entrades EM (amb hores d'estada a l'empresa)  
-- Genera fitxers Excel amb:  
-  - Notes dels estudiants per a cada RA  
-  - Columnes espaiades correctament per a les qualificacions de MP  
-  - Disposició especial de columnes per als MP amb entrades EM  
-  - Protecció de cèl·lules: Totes les cèl·lules estan bloquejades excepte les cèl·lules de percentatges de RA a la darrera fila. Utilitzeu la contrasenya "edita'm" per desbloquejar.  
+### Processament de PDF
+- Extracció automàtica de taules dels informes de qualificacions en PDF
+- Processament intel·ligent dels noms i notes dels estudiants
+- Identificació automàtica dels MP amb hores d'estada a l'empresa (EM)
+
+### Fitxer Excel Detallat
+- Vista completa de totes les qualificacions de RA i MP
+- Organització clara per estudiant i MP
+- Format condicional per a una millor visualització
+- Protecció de cel·les amb contrasenya "edita'm"
+- Fórmules integrades per a càlculs automàtics
+
+### Resum de Qualificacions
+- Vista consolidada de les notes per a cada MP
+- Diferents formats numèrics per a tipus A (2 decimals) i tipus B (nombres enters)
+- Llegenda integrada que explica els tipus de MP
+- Colors alternats per a millor llegibilitat
+- Validació de dades per assegurar valors correctes
+- Formatació professional i preparada per a la impressió
 
 ## Requisits
 
@@ -25,10 +38,12 @@ Una eina en Python per extreure i processar els registres de qualificacions de l
 
 ```
 .
-├── input_pdf_files/          # Directori per als fitxers PDF d'entrada
-│   └── .gitkeep              # Manté el directori a git però ignora els continguts
-├── output_xlsx_files/        # Directori per als fitxers Excel de sortida
-│   └── .gitkeep              # Manté el directori a git però ignora els continguts
+├── 01_source_pdfs/           # Directori per als fitxers PDF d'entrada
+│   └── .gitkeep              # Manté el directori a Git però ignora els continguts
+├── 02_extracted_data/        # Directori per als fitxers Excel de sortida
+│   └── .gitkeep              # Manté el directori a Git però ignora els continguts
+├── 03_final_grade_summaries/ # Directori per als fitxers Excel de resum final
+│   └── .gitkeep              # Manté el directori a Git però ignora els continguts
 ├── rules/                    # Regles de configuració del projecte
 │   └── column-context.md     # Regles de context de columnes
 ├── src/                      # Paquet de codi font
@@ -36,7 +51,8 @@ Una eina en Python per extreure i processar els registres de qualificacions de l
 │   ├── pdf_processor.py      # Extracció i processament de PDFs
 │   ├── data_processor.py     # Utilitats de processament de dades generals
 │   ├── grade_processor.py    # Lògica específica de qualificacions
-│   └── excel_processor.py    # Generació i formatació d'Excel
+│   ├── excel_processor.py    # Generació i formatació d'Excel
+│   └── summary_generator.py  # Generació d'informes de qualificacions
 ├── cursor.config.jsonc       # Configuració de Cursor
 ├── windsurf.config.jsonc     # Configuració de Windsurf
 ├── Dockerfile                # Configuració del contenidor Docker
@@ -68,7 +84,13 @@ Una eina en Python per extreure i processar els registres de qualificacions de l
 - **excel_processor.py**: Gestió de fitxers Excel  
   - Generació de fitxers Excel  
   - Espaiat i organització de columnes  
-  - (Futur) Format i fórmules  
+  - Format i fórmules
+
+- **summary_generator.py**: Generació d'informes de qualificacions  
+  - Crea resums de qualificacions per a cada MP  
+  - Inclou codis de RA i notes dels estudiants  
+  - Aplica format condicional per a una millor llegibilitat  
+  - Genera llegenda explicativa dels tipus de MP  
 
 ## Instal·lació i ús
 
@@ -105,9 +127,9 @@ Tens dues opcions per executar el contenidor:
    ```
 
 **Nota**: El script:
-- Buscarà els fitxers PDF en el directori `input_pdf_files`
+- Buscarà els fitxers PDF en el directori `01_source_pdfs`
 - Processarà cada fitxer PDF individualment
-- Generarà els fitxers Excel de sortida en el directori `output_xlsx_files`
+- Generarà els fitxers Excel de sortida en el directori `02_extracted_data`
 - Anomenarà cada fitxer de sortida basant-se en el codi de grup trobat en el seu PDF corresponent
 - Saltarà els fitxers que no són PDFs o no es poden processar
 - Continuarà processant els fitxers restants fins i tot si algun falla

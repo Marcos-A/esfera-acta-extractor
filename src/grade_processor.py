@@ -50,7 +50,7 @@ def find_mp_codes_with_em(melted: pd.DataFrame, mp_codes: list[str]) -> list[str
     """
     em_entry_pattern = re.compile(
         r"""
-        (?P<code>[A-Za-z0-9]{4,}                # MP code format
+        (?P<code>[A-Za-z0-9]{3,5}               # MP code format
         _               
         [A-Za-z0-9]{4,5}                        # CF code format
         _                       

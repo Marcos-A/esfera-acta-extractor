@@ -783,9 +783,7 @@ def export_excel_with_spacing(
     
     # Apply conditional formatting (now without percentage validation)
     apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes, include_weighting)
-    
-    #print(f"\t- Exported {len(export_df)-1} entries to {output_path}")
-    
+      
     # Apply cell protection
     apply_cell_protection(output_path, mp_codes_with_em, mp_codes, mp_groups, include_weighting)
 
