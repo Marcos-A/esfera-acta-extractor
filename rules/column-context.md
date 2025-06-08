@@ -1,6 +1,6 @@
-# Cursor Project Rules
+# Cursor / Windsurf Project Rules
 
-This file defines the core column structure and MP types used throughout the Cursor project. Include this file's content in all AI prompts and code-generation tasks to avoid re-explaining the context.
+This file defines the core column structure and MP types used throughout the Cursor / Windsurf project. Include this file's content in all AI prompts and code-generation tasks to avoid re-explaining the context.
 
 ## Column types
 
