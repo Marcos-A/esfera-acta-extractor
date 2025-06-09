@@ -73,13 +73,13 @@ def process_pdf(pdf_path: str) -> None:
     # 9) Extract RA records using original entry_pattern
     ra_entry_pattern = re.compile(
         r"""
-        (?P<code>[A-Za-z0-9]{3,5}               # MP code format
+        (?P<code>[A-Za-z0-9]{3,5}                # MP code format
         _               
-        [A-Za-z0-9]{4,5}                        # CF code format
+        [A-Za-z0-9]{4,5}                         # CF code format
         _                       
-        \d(?:\s*\d)RA)                          # RA
-        \s\(\d\)\s*-\s*                         # round (convocatòria)
-        (?P<grade>A\d{1,2}|PDT|EP|NA)           # grade options: A#, PDT, EP, NA
+        \d(?:\s*\d)RA)                           # RA
+        \s\(\d\)\s*-\s*                          # round (convocatòria)
+        (?P<grade>A\d{1,2}|PDT|EP|NA)            # grade options: A#, PDT, EP, NA
         """,
         flags=re.IGNORECASE | re.VERBOSE
     )
@@ -88,13 +88,13 @@ def process_pdf(pdf_path: str) -> None:
     # 10) Extract EM records using original entry_pattern
     em_entry_pattern = re.compile(
         r"""
-        (?P<code>[A-Za-z0-9]{3,5}               # MP code format
+        (?P<code>[A-Za-z0-9]{3,5}                # MP code format
         _               
-        [A-Za-z0-9]{4,5}                        # CF code format
+        [A-Za-z0-9]{4,5}                         # CF code format
         _                       
-        \d(?:\s*\d)EM)                          # EM
-        \s\(\d\)\s*-\s*                         # round (convocatòria)
-        (?P<grade>A\d{1,2}|PDT|EP|NA)           # grade options: A#, PDT, EP, NA
+        \d(?:\s*\d)EM)                           # EM
+        \s\(\d\)\s*-\s*                          # round (convocatòria)
+        (?P<grade>A\d{1,2}|PDT|EP|NA)            # grade options: A#, PDT, EP, NA
         """,
         flags=re.IGNORECASE | re.VERBOSE
     )

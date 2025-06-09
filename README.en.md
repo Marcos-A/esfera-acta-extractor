@@ -3,15 +3,16 @@
 # Esfer@ Acta Extractor
 
 A Python tool to extract and process grade records from Esfer@'s PDF grade reports. The tool parses PDF tables, processes student grades, and generates two types of Excel files:
-1. A detailed file with all RA (Learning Achievement) and MP (Professional Module) grades.
-2. A summary report for each MP with student grades and a clear results overview.
+1. A detailed file with all RA (Learning Achievement), EM (Workplace Training), and MP (Professional Module) grades.
+2. A summary report for each MP with student grades and a clear results overview, including both center and company evaluations where applicable.
 
 ## Features
 
 ### PDF Processing
 - Automatic extraction of grade reports from PDF files
 - Intelligent processing of student names and grades
-- Automatic identification of MPs with Workplace Training (EM) hours
+- Support for RA (Learning Achievement), EM (Workplace Training), and MP (Professional Module) grades
+- Automatic identification of MPs with Workplace Training (EM) hours and their corresponding grades
 
 ### Detailed Excel File
 - Comprehensive view of all RA and MP grades

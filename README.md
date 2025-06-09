@@ -3,15 +3,16 @@
 # Esfer@ Acta Extractor
 
 Una eina en Python per extreure i processar els registres de qualificacions de les actes de notes en PDF d'Esfer@. L'eina extreu les taules dels PDF, processa les notes dels estudiants i genera dos tipus de fitxers Excel:
-1. Un fitxer detallat amb totes les qualificacions de RA (Resultats d'Aprenentatge) i MP (Mòdul Professional).
-2. Un resum de qualificacions per a cada MP amb les notes dels estudiants i una vista clara dels resultats.
+1. Un fitxer detallat amb totes les qualificacions de RA (Resultats d'Aprenentatge), EM (Estada a l'Empresa) i MP (Mòdul Professional).
+2. Un resum de qualificacions per a cada MP amb les notes dels estudiants i una vista clara dels resultats, incloent tant l'avaluació del centre com de l'empresa quan correspongui.
 
 ## Característiques
 
 ### Processament de PDF
 - Extracció automàtica de taules dels informes de qualificacions en PDF
 - Processament intel·ligent dels noms i notes dels estudiants
-- Identificació automàtica dels MP amb hores d'estada a l'empresa (EM)
+- Suport per a qualificacions de RA (Resultats d'Aprenentatge), EM (Estada a l'Empresa) i MP (Mòdul Professional)
+- Identificació automàtica dels MP amb hores d'estada a l'empresa (EM) i les seves qualificacions corresponents
 
 ### Fitxer Excel Detallat
 - Vista completa de totes les qualificacions de RA i MP
