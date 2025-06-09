@@ -15,11 +15,9 @@ Una eina en Python per extreure i processar els registres de qualificacions de l
 - Identificació automàtica dels MP amb hores d'estada a l'empresa (EM) i les seves qualificacions corresponents
 
 ### Fitxer Excel Detallat
-- Vista completa de totes les qualificacions de RA i MP
+- Vista completa de totes les qualificacions de RA, EM i MP
 - Organització clara per estudiant i MP
 - Format condicional per a una millor visualització
-- Protecció de cel·les amb contrasenya "edita'm"
-- Fórmules integrades per a càlculs automàtics
 
 ### Resum de Qualificacions
 - Vista consolidada de les notes per a cada MP

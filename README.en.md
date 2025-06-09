@@ -15,11 +15,9 @@ A Python tool to extract and process grade records from Esfer@'s PDF grade repor
 - Automatic identification of MPs with Workplace Training (EM) hours and their corresponding grades
 
 ### Detailed Excel File
-- Comprehensive view of all RA and MP grades
+- Comprehensive view of all RA, EM and MP grades
 - Clear organization by student and MP
 - Conditional formatting for better visualization
-- Cell protection with password "edita'm"
-- Built-in formulas for automatic calculations
 
 ### Grade Summary
 - Consolidated view of grades for each MP
