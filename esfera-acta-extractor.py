@@ -37,7 +37,7 @@ from src.excel_processor import export_excel_with_spacing
 import glob
 
 
-def process_pdf(pdf_path: str, include_weighting: bool) -> None:
+def process_pdf(pdf_path: str) -> None:
     """
     Process a single PDF file and generate the corresponding Excel output.
     """
@@ -101,15 +101,13 @@ def process_pdf(pdf_path: str, include_weighting: bool) -> None:
     wide = wide.reset_index()
     
     # 13) Export to Excel with proper spacing between MP groups
-    export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes, include_weighting=include_weighting)
+    export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes)
 
 
 def main() -> None:
     """
     Main function to process all PDF files in the input directory.
-    """
-    INCLUDE_GRADE_WEIGHTING = False  # Default: Off. Set to True to include weighting row.
-    
+    """    
     # Create output directory if it doesn't exist
     if not os.path.exists('02_extracted_data'):
         os.makedirs('02_extracted_data')
@@ -123,7 +121,7 @@ def main() -> None:
     for pdf_file in pdf_files:
         print(f"\Extracting data from {pdf_file}...")
         try:
-            process_pdf(pdf_file, include_weighting=INCLUDE_GRADE_WEIGHTING)
+            process_pdf(pdf_file)
             print(f"\t- Successfully extracted data from {pdf_file}")
         except Exception as e:
             print(f"ERROR processing {pdf_file}: {str(e)}")
@@ -152,7 +150,7 @@ def main() -> None:
             # summary_output_dir is '03_final_grade_summaries', defined above
             output_summary_path = os.path.join(summary_output_dir, summary_file_name)
             try:
-                generate_summary_report(source_xlsx_file, output_summary_path, include_weighting=INCLUDE_GRADE_WEIGHTING)
+                generate_summary_report(source_xlsx_file, output_summary_path)
                 print(f"\t- Successfully generated summary: {output_summary_path}")
             except Exception as e:
                 print(f"ERROR generating summary for {source_xlsx_file}: {str(e)}")

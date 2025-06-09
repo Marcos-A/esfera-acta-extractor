@@ -31,15 +31,14 @@ def _extract_mp_codes_from_columns(columns: list[str]) -> list[str]:
 MAX_READ_ATTEMPTS = 3
 READ_RETRY_DELAY_SECONDS = 5
 
-def generate_summary_report(source_xlsx_path: str, output_summary_path: str, include_weighting: bool):
+def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
     """Generates a summary Excel report from a detailed grade Excel file."""
     df_source = None
     
     # 1. Read Source XLSX with retries for temporary issues
     for attempt in range(1, MAX_READ_ATTEMPTS + 1):
         try:
-            footer_rows = 1 if include_weighting else 0
-            df_source = pd.read_excel(source_xlsx_path, sheet_name=0, skipfooter=footer_rows)
+            df_source = pd.read_excel(source_xlsx_path, sheet_name=0)
             break  # Success, exit retry loop
         except FileNotFoundError:
             print(f"[ERROR summary_generator] Source file not found: {source_xlsx_path}. This usually means it was deleted after being listed.")
