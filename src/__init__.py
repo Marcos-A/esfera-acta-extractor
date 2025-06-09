@@ -12,7 +12,7 @@ from .data_processor import (
     clean_entries
 )
 from .grade_processor import (
-    extract_ra_records,
+    extract_records,
     extract_mp_codes,
     find_mp_codes_with_em,
     sort_records
@@ -28,7 +28,7 @@ __all__ = [
     'join_nonempty',
     'select_melt_code_conv_grades',
     'clean_entries',
-    'extract_ra_records',
+    'extract_records',
     'extract_mp_codes',
     'find_mp_codes_with_em',
     'sort_records',

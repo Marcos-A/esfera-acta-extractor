@@ -203,7 +203,7 @@ def apply_conditional_formatting(
     mp_groups: dict[str, list[str]],
     mp_codes_with_em: list[str],
     mp_codes: list[str]
-    ) -> None:
+) -> None:
     """
     Apply conditional formatting rules to highlight:
     - For RA columns:
@@ -277,92 +277,83 @@ def apply_conditional_formatting(
     wb.save(workbook_path)
 
 
-def apply_mp_sum_formulas(
-    workbook_path: str,
-    mp_groups: dict[str, list[str]],
-    mp_codes_with_em: list[str],
-    mp_codes: list[str]
-    ) -> None:
-    """
-    Apply Excel formulas to calculate MP sums in the last row and SUMPRODUCT for student grades.
-    For MPs with EM:
-    - MP CENTRE column:
-      * Checks if RA percentages sum to 90%, shows error if not
-      * Shows "NO SUPERAT" if any RA grade is below 5
-      * For students: checks if all values are valid numbers using COUNT
-      * For percentage row: sums all RA percentages
-    - MP EMPRESA column is set to 10%
-    - MP column uses SUMPRODUCT between CENTRE and EMPRESA columns, rounded to integer
-    For other MPs:
-    - MP column:
-      * Checks if RA percentages sum to 100%, shows error if not
-      * Shows "NO SUPERAT" if any RA grade is below 5
-      * Checks if all values are valid numbers using COUNT
-      * Uses SUMPRODUCT for weighted calculation, rounded to integer
+# def apply_mp_sum_formulas(
+#     workbook_path: str,
+#     mp_groups: dict[str, list[str]],
+#     mp_codes_with_em: list[str],
+#     mp_codes: list[str]
+# ) -> None:
+#     """
+#     Apply Excel formulas to calculate MP sums in the last row and SUMPRODUCT for student grades.
+#     For MPs with EM:
+#     - MP CENTRE column:
+#       * Checks if RA percentages sum to 90%, shows error if not
+#       * Shows "NO SUPERAT" if any RA grade is below 5
+#       * For students: checks if all values are valid numbers using COUNT
+#       * For percentage row: sums all RA percentages    
+#     Args:
+#         workbook_path: Path to the Excel workbook
+#         mp_groups: Dictionary mapping MP codes to their RA codes
+#         mp_codes_with_em: List of MP codes that have EM entries
+#         mp_codes: List of all MP codes
+#     """
+#     wb = load_workbook(workbook_path)
+#     ws = wb.active
+#     last_row = ws.max_row
     
-    Args:
-        workbook_path: Path to the Excel workbook
-        mp_groups: Dictionary mapping MP codes to their RA codes
-        mp_codes_with_em: List of MP codes that have EM entries
-        mp_codes: List of all MP codes
-    """
-    wb = load_workbook(workbook_path)
-    ws = wb.active
-    last_row = ws.max_row
+#     # Helper function to get column letter
+#     def get_column_for_header(header: str) -> str:
+#         # Ensure header is a string before attempting string operations
+#         header_str = str(header) if header is not None else ""
+#         for cell in ws[1]:  # First row
+#             if cell.value:
+#                 # Ensure cell.value is a string before attempting string operations
+#                 cell_value_str = str(cell.value) if cell.value is not None else ""
+#                 # Replace both \n and \r (Windows newline)
+#                 cell_value_clean = cell_value_str.replace('\n', '').replace('\r', '')
+#                 header_clean = header_str.replace('\n', '').replace('\r', '')
+#                 if cell_value_clean == header_clean:
+#                     return get_column_letter(cell.column)
+#         return None
     
-    # Helper function to get column letter
-    def get_column_for_header(header: str) -> str:
-        # Ensure header is a string before attempting string operations
-        header_str = str(header) if header is not None else ""
-        for cell in ws[1]:  # First row
-            if cell.value:
-                # Ensure cell.value is a string before attempting string operations
-                cell_value_str = str(cell.value) if cell.value is not None else ""
-                # Replace both \n and \r (Windows newline)
-                cell_value_clean = cell_value_str.replace('\n', '').replace('\r', '')
-                header_clean = header_str.replace('\n', '').replace('\r', '')
-                if cell_value_clean == header_clean:
-                    return get_column_letter(cell.column)
-        return None
-    
-    # For each MP, create appropriate formulas
-    for mp_code in mp_codes:
-        ra_codes = mp_groups.get(mp_code, []) # Use .get for safety
-        ra_columns = [get_column_for_header(ra) for ra in ra_codes]
-        ra_columns = [col for col in ra_columns if col is not None]
+#     # For each MP, create appropriate formulas
+#     for mp_code in mp_codes:
+#         ra_codes = mp_groups.get(mp_code, []) # Use .get for safety
+#         ra_columns = [get_column_for_header(ra) for ra in ra_codes]
+#         ra_columns = [col for col in ra_columns if col is not None]
         
-        if ra_columns:
-            first_ra_col = ra_columns[0]
-            last_ra_col = ra_columns[-1]
+#         if ra_columns:
+#             first_ra_col = ra_columns[0]
+#             last_ra_col = ra_columns[-1]
             
-            failing_grades_check_parts = []
-            for ra_col in ra_columns:
-                failing_grades_check_parts.append(f'AND(ISNUMBER({ra_col}{{row}}),{ra_col}{{row}}<5)')
-            any_failing = f'OR({",".join(failing_grades_check_parts)})'
+#             failing_grades_check_parts = []
+#             for ra_col in ra_columns:
+#                 failing_grades_check_parts.append(f'AND(ISNUMBER({ra_col}{{row}}),{ra_col}{{row}}<5)')
+#             any_failing = f'OR({",".join(failing_grades_check_parts)})'
             
-            if mp_code in mp_codes_with_em:
-                centre_column = get_column_for_header(f'{mp_code} CENTRE')
-                empresa_column = get_column_for_header(f'{mp_code} EMPRESA')
-                mp_column_em = get_column_for_header(mp_code) # Renamed to avoid conflict
+#             if mp_code in mp_codes_with_em:
+#                 centre_column = get_column_for_header(f'{mp_code} CENTRE')
+#                 empresa_column = get_column_for_header(f'{mp_code} EMPRESA')
+#                 mp_column_em = get_column_for_header(mp_code) # Renamed to avoid conflict
 
-                if centre_column:
-                    for row_idx in range(2, last_row+1): # Student rows
-                        cell = ws[f'{centre_column}{row_idx}']
-                        cell.value = None
+#                 if centre_column:
+#                     for row_idx in range(2, last_row+1): # Student rows
+#                         cell = ws[f'{centre_column}{row_idx}']
+#                         cell.value = None
                 
-                if mp_column_em and centre_column and empresa_column: # Ensure all columns found
-                    for row_idx in range(2, last_row+1): # Student rows
-                        cell = ws[f'{mp_column_em}{row_idx}']
-                        cell.value = None
+#                 if mp_column_em and centre_column and empresa_column: # Ensure all columns found
+#                     for row_idx in range(2, last_row+1): # Student rows
+#                         cell = ws[f'{mp_column_em}{row_idx}']
+#                         cell.value = None
 
-            else: # Regular MPs (Type B)
-                mp_column_regular = get_column_for_header(mp_code) # Renamed to avoid conflict
-                if mp_column_regular:
-                    for row_idx in range(2, last_row+1): # Student rows
-                        cell = ws[f'{mp_column_regular}{row_idx}']
-                        cell.value = None
+#             else: # Regular MPs (Type B)
+#                 mp_column_regular = get_column_for_header(mp_code) # Renamed to avoid conflict
+#                 if mp_column_regular:
+#                     for row_idx in range(2, last_row+1): # Student rows
+#                         cell = ws[f'{mp_column_regular}{row_idx}']
+#                         cell.value = None
     
-    wb.save(workbook_path)
+#     wb.save(workbook_path)
 
 
 def export_excel_with_spacing(
@@ -375,32 +366,44 @@ def export_excel_with_spacing(
     Export DataFrame to Excel with specific column spacing after each MP's RAs.
     - 3 empty columns after MPs with EM (named: MP CENTRE, MP EMPRESA, MP)
     - 1 empty column after other MPs (named: MP)
-    - Adds a "PONDERACIÓ (%}" row after student entries with percentage calculations
     - Uses Excel formulas to dynamically sum RA percentages for each MP
     - Applies data validation for percentage cells
     - Applies conditional formatting for invalid grades
     - Protects all cells except RA percentage cells
     Uses pre-computed mp_codes list for efficient grouping.
     """
-    # Get the current column order (excluding 'estudiant')
-    ra_codes = [col for col in df.columns if col != 'estudiant']
+    # Filter out MP grade columns (those that don't end with EM or RA)
+    # and exclude the 'estudiant' column from processing
+    non_mp_columns = [col for col in df.columns 
+                         if col.endswith(('EM', 'RA')) or col == 'estudiant']
+    # Remove suffixes from MP grade columns
+    df = df.rename(
+        columns=lambda col: col.split('_')[0] if col not in non_mp_columns else col
+    )
+    # Get MP grade columns
+    mp_grade_columns = [col for col in df.columns if not col.endswith('EM') and
+                         not col.endswith('RA') and col != 'estudiant']
+    # Create a filtered DataFrame with non-MP grade columns
+    df_without_mp_grades = df[non_mp_columns].copy()
     
-    # Group RA codes by their MP. Sort mp_codes by length descending to match longer MPs first (e.g., MP10 before MP1).
+    # Get the current column order (excluding 'estudiant')
+    ra_codes = [col for col in df_without_mp_grades.columns if col != 'estudiant']
+    
+    # Group RA codes by their MP. Sort mp_codes by length descending to match longer MPs first.
     # Use startswith(mp_code + '_') for more precise matching.
     mp_groups = {mp: [] for mp in mp_codes}
-    sorted_mp_codes = sorted(mp_codes, key=len, reverse=True) # Sort MPs
+    sorted_mp_codes = sorted(mp_codes, key=len, reverse=True)  # Sort MPs by length
 
     for ra_code in ra_codes:
         found_mp = False
         for mp_code in sorted_mp_codes:
-            if ra_code.startswith(mp_code + '_'): # Precise matching
+            if ra_code.startswith(mp_code + '_'):  # Precise matching
                 mp_groups[mp_code].append(ra_code)
                 found_mp = True
                 break
-        if not found_mp:
-            # This case should ideally not happen if RAs are well-named (e.g. MPXX_RAX)
-            # Consider logging a warning or handling as an error if an RA doesn't match any MP
-            print(f"Warning: RA code '{ra_code}' did not match any known MP code prefix.")
+        if not found_mp and not ra_code.endswith(('EM', 'RA')):
+            # Only warn for non-EM, non-RA codes that don't match any MP
+            print(f"Warning: Code '{ra_code}' did not match any known MP code prefix and is not an EM/RA code.")
     
     # Add empty spacing columns with explicit numeric type for calculations
     new_columns = ['estudiant']  # Start with student name column
@@ -419,19 +422,78 @@ def export_excel_with_spacing(
         else:
             new_columns.append(f'{mp_code}')
     
-    # Start with a copy of the original DataFrame's data for existing columns
-    export_df = df.copy()
+    # Start with the filtered DataFrame that only contains valid grade columns
+    export_df = df_without_mp_grades.copy()
 
+    # Create a mapping of EM codes to their corresponding MP codes
+    em_to_mp = {}
+    for mp_code in mp_codes_with_em:
+        # Find all EM codes for this MP (format: MP_CF_1EM or MP_CF_12EM)
+        em_codes = [col for col in export_df.columns if col.startswith(f'{mp_code}_') and col.endswith('EM')]
+        for em_code in em_codes:
+            em_to_mp[em_code] = mp_code
+    
     # Add new placeholder columns (MP, CENTRE, EMPRESA) if they don't exist
-    # These are the columns present in new_columns but not in original df
     for col_name in new_columns:
         if col_name not in export_df.columns:
-            export_df[col_name] = pd.Series(dtype='float64', index=export_df.index) # Ensure correct index
-
+            export_df[col_name] = pd.Series(dtype='float64', index=export_df.index)
+    
     # Ensure all columns from new_columns are present and in the correct order
-    # This also handles the case where some RA columns might not have been in the initial df
-    # (though current logic implies df contains all ra_codes)
     export_df = export_df.reindex(columns=new_columns)
+
+    print(mp_grade_columns)
+    for mp_code in mp_grade_columns:
+        print(mp_code)
+        if mp_code in export_df.columns:
+            print("Found")
+            # `df` here is still the renamed DataFrame, which has the original
+            # grade values under column `mp_code`
+            export_df[mp_code] = df[mp_code]
+    print(export_df.iloc[:, :14])
+    # First, export the DataFrame to Excel
+    output_path = output_path.replace('.csv', '.xlsx')
+    export_df.to_excel(output_path, index=False)
+    
+    # Now process EM records in the Excel file
+    wb = load_workbook(output_path)
+    ws = wb.active
+    
+    # Helper function to get column letter for a header
+    def get_col_letter(header):
+        for cell in ws[1]:
+            if str(cell.value).strip() == header:
+                return get_column_letter(cell.column)
+        return None
+    
+    # Process EM records if there are any
+    if em_to_mp:
+        for em_code, mp_code in em_to_mp.items():
+            empresa_header = f'{mp_code} EMPRESA'
+            em_col = get_col_letter(em_code)
+            empresa_col = get_col_letter(empresa_header)
+            
+            if em_col and empresa_col:
+                # Copy EM grades to EMPRESA column
+                for row_idx in range(2, ws.max_row + 1):
+                    em_cell = ws[f'{em_col}{row_idx}']
+                    empresa_cell = ws[f'{empresa_col}{row_idx}']
+                    if em_cell.value is not None:
+                        empresa_cell.value = em_cell.value
+                
+                # Remove the original EM column
+                ws.delete_cols(ws[em_col][0].column, 1)
+        
+        # Save the workbook after processing all EM records
+        wb.save(output_path)
+    
+    # Remove EM codes from mp_groups to avoid processing them as RA columns
+    for em_code in em_to_mp:
+        mp_code = em_to_mp[em_code]
+        if mp_code in mp_groups and em_code in mp_groups[mp_code]:
+            mp_groups[mp_code].remove(em_code)
+    
+    # Reload the DataFrame to reflect any changes
+    export_df = pd.read_excel(output_path)
     
     # Convert numeric columns to float64 explicitly
     numeric_cols = export_df.select_dtypes(include=['int64', 'float64']).columns
@@ -443,13 +505,9 @@ def export_excel_with_spacing(
     non_numeric_cols = export_df.columns.difference(numeric_cols)
     export_df[non_numeric_cols] = export_df[non_numeric_cols].fillna('')
     
-    # Export to Excel
-    output_path = output_path.replace('.csv', '.xlsx')
+    # Export the final DataFrame to Excel
     export_df.to_excel(output_path, index=False)
-    
-    # Apply Excel formulas for MP sums
-    apply_mp_sum_formulas(output_path, mp_groups, mp_codes_with_em, mp_codes)
-    
+
     # Apply row formatting (borders, bold, background colors)
     apply_row_formatting(output_path, mp_codes_with_em, mp_codes)
     

@@ -5,8 +5,8 @@ This file defines the core column structure and MP types used throughout the Cur
 ## Column types
 
 * **RA grade columns**: headers contain the MP code, the RA expression, RA number, etc.
-* **CENTRE grade columns**: headers contain the MP code and the literal "CENTRE".
-* **EMPRESA grade columns**: headers contain the MP code and the literal "EMPRESA".
+* **CENTRE grade columns**: headers contain the MP code, a space and the literal "CENTRE".
+* **EMPRESA grade columns**: headers contain the MP code, a space and the literal "EMPRESA".
 * **MP grade columns**: headers contain the MP code alone (no RA, CENTRE, or EMPRESA).
 
 ## MP types

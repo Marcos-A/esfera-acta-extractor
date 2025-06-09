@@ -27,7 +27,7 @@ from src import (
     join_nonempty,
     select_melt_code_conv_grades,
     clean_entries,
-    extract_ra_records,
+    extract_records,
     extract_mp_codes,
     find_mp_codes_with_em,
     sort_records,
@@ -41,6 +41,9 @@ def process_pdf(pdf_path: str) -> None:
     """
     Process a single PDF file and generate the corresponding Excel output.
     """
+    # Create output directory if it doesn't exist
+    os.makedirs('02_extracted_data', exist_ok=True)
+    
     # Extract group code for filename
     group_code = extract_group_code(pdf_path)
     output_xlsx = os.path.join('02_extracted_data', f'{group_code}.xlsx')
@@ -80,27 +83,65 @@ def process_pdf(pdf_path: str) -> None:
         """,
         flags=re.IGNORECASE | re.VERBOSE
     )
-    records = extract_ra_records(melted, name_col, ra_entry_pattern)
-    # 10) Get unique MP codes and identify those with EM entries
-    mp_codes = extract_mp_codes(records)
-    mp_codes_with_em = find_mp_codes_with_em(melted, mp_codes)
-    # 11) Sort records by student and RA code
-    records = sort_records(records)
-    # 12) Pivot to wide format: students × RA codes
-    wide = records.pivot(index='estudiant', columns='ra_code', values='grade')
+    ra_records = extract_records(melted, name_col, ra_entry_pattern)
+
+    # 10) Extract EM records using original entry_pattern
+    em_entry_pattern = re.compile(
+        r"""
+        (?P<code>[A-Za-z0-9]{3,5}               # MP code format
+        _               
+        [A-Za-z0-9]{4,5}                        # CF code format
+        _                       
+        \d(?:\s*\d)EM)                          # EM
+        \s\(\d\)\s*-\s*                         # round (convocatòria)
+        (?P<grade>A\d{1,2}|PDT|EP|NA)           # grade options: A#, PDT, EP, NA
+        """,
+        flags=re.IGNORECASE | re.VERBOSE
+    )
+    em_records = extract_records(melted, name_col, em_entry_pattern)
     
-    # Convert numeric grades to float where possible, keep others as strings
+    # 11) Extract MP records using entry pattern
+    mp_entry_pattern = re.compile(
+        r"""
+        (?<!\S)                                   # must start at whitespace or BOF
+        (?P<code>[A-Za-z0-9]{3,5}                 # MP code format
+        _                                         # exactly one underscore
+        [A-Za-z0-9]{4,5})                         # CF code format
+        \s\(\d\)\s*-\s*                           # round (convocatòria)
+        (?P<grade>A\d{1,2} | PDT | EP | NA | PQ)  # grade options: A#, PDT, EP, NA, PQ
+        (?!\S)                                    # must end at whitespace or EOF
+        """,
+        flags=re.VERBOSE | re.IGNORECASE
+    )
+    
+    mp_records = extract_records(melted, name_col, mp_entry_pattern)
+
+    # 12) Combine RA, EM and MP records
+    combined_records = pd.concat([ra_records, em_records, mp_records], ignore_index=True)
+
+    # 13) Get unique MP codes and identify those with EM entries
+    mp_codes = extract_mp_codes(ra_records)
+    mp_codes_with_em = find_mp_codes_with_em(melted, mp_codes)
+    # 14) Sort records by student and code
+    combined_records = sort_records(combined_records)
+    # 15) Pivot to wide format: students × codes
+    wide = combined_records.pivot(index='estudiant', columns='code', values='grade')
+    # print(wide)
+    # Convert numeric grades to float where possible, keep non-numeric grades as strings
     for col in wide.columns:
         if col != 'estudiant':
-            # Convert to float if possible, keep as string if not
-            wide[col] = pd.to_numeric(wide[col], errors='coerce')
-            # Fill NaN with empty string for string columns
-            if pd.api.types.is_string_dtype(wide[col]):
-                wide[col] = wide[col].fillna('')
+            # Convert to numeric where possible, keeping non-numeric values as strings
+            # First, convert to string to handle all values consistently
+            str_series = wide[col].astype(str)
+            # Try to convert to numeric, keeping original strings where conversion fails
+            numeric_series = pd.to_numeric(wide[col], errors='coerce')
+            # Combine numeric and string values
+            wide[col] = numeric_series.combine(str_series, 
+                lambda x, y: x if pd.notna(x) else (y if y != 'nan' else ''))
     
     wide = wide.reset_index()
-    
-    # 13) Export to Excel with proper spacing between MP groups
+
+    # 16) Export to Excel with proper spacing between MP groups
     export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes)
 
 

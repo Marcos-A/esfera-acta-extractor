@@ -6,13 +6,13 @@ import re
 import pandas as pd
 
 
-def extract_ra_records(
+def extract_records(
     melted: pd.DataFrame,
     name_col: str,
     entry_pattern: re.Pattern
 ) -> pd.DataFrame:
     """
-    Extract RA code & grade pairs from each entry via regex.
+    Extract RA, EM or MP code & grade pairs from each entry via regex.
     Transforms grades:
     - Numeric grades (e.g. 'A7') are converted to integers (7)
     - Non-numeric grades (PDT, EP, NA) are kept as strings
@@ -26,11 +26,11 @@ def extract_ra_records(
             
             rows.append({
                 'estudiant': row[name_col],
-                'ra_code': code,
+                'code': code,
                 'grade': grade
             })
     df = pd.DataFrame(rows)
-    df['ra_code'] = df['ra_code'].str.replace(r"\s+", '', regex=True)
+    df['code'] = df['code'].str.replace(r"\s+", '', regex=True)
     return df
 
 
@@ -39,7 +39,7 @@ def extract_mp_codes(records: pd.DataFrame) -> list[str]:
     Extract unique MP codes from RA codes.
     """
     mp_pattern = re.compile(r'^([A-Za-z0-9]+)_')
-    mp_codes = records['ra_code'].str.extract(mp_pattern, expand=False)
+    mp_codes = records['code'].str.extract(mp_pattern, expand=False)
     return sorted(mp_codes.unique().tolist())
 
 
@@ -90,7 +90,7 @@ def sort_records(df: pd.DataFrame) -> pd.DataFrame:
     """
     df['estudiant'] = df['estudiant'].str.replace(r"\s*\n\s*", ' ', regex=True).str.strip()
     df = df.sort_values(
-        by=['estudiant', 'ra_code'],
+        by=['estudiant', 'code'],
         key=lambda c: c.str.lower()
     ).reset_index(drop=True)
     return df 
