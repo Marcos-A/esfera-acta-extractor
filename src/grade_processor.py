@@ -9,8 +9,7 @@ import pandas as pd
 def extract_records(
     melted: pd.DataFrame,
     name_col: str,
-    entry_pattern: re.Pattern,
-    print_codes: bool = False
+    entry_pattern: re.Pattern
 ) -> pd.DataFrame:
     """
     Extract RA, EM or MP code & grade pairs from each entry via regex.
@@ -19,9 +18,6 @@ def extract_records(
     - Purely numeric grades (e.g. '8') are converted to the integer 8
     - Other grades (PDT, EP, NA, etc.) are kept as strings
     """
-    if print_codes:
-        print(melted)
-        print(name_col)
     rows = []
     for _, row in melted.iterrows():
         for code, grade in entry_pattern.findall(row['entry']):

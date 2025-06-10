@@ -114,7 +114,7 @@ def process_pdf(pdf_path: str) -> None:
         flags=re.VERBOSE | re.IGNORECASE
     )
     
-    mp_records = extract_records(melted, name_col, mp_entry_pattern, print_codes=True)
+    mp_records = extract_records(melted, name_col, mp_entry_pattern)
     # print(mp_records)
     # 12) Combine RA, EM and MP records
     combined_records = pd.concat([ra_records, em_records, mp_records], ignore_index=True)

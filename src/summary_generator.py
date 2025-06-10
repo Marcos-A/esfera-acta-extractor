@@ -92,7 +92,7 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
             break
     
     if not student_col_actual_name:
-        print(f"[ERROR summary_generator] Could not find a student column (e.g., 'estudiant') in {source_xlsx_path}. Cannot generate summary.")
+        print(f"[ERROR summary_generator] Could not find a student column (e.g., 'estudiant') in {source_xlsx_path}.")
         return
 
     summary_df_cols_to_select = [student_col_actual_name] + [info['col_name'] for info in mp_info_for_summary]
@@ -273,10 +273,17 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
         # New fill for specific strings
         orange_fill = PatternFill(start_color="FFE6CC", end_color="FFE6CC", fill_type="solid")
 
+        # Define red font for numbers < 5
+        red_font = Font(color="FF0000")
+
         for col_idx, col_name in enumerate(summary_df.columns, 1):
-            if col_name.lower() == 'estudiant':
-                continue  # Skip student column
+            # IMPORTANT: Skip the first two columns ('#' and 'estudiant') for conditional formatting
+            if col_name.lower() == 'estudiant' or col_name == '#':
+                continue
                 
+            # Determine the threshold for red text based on column name
+            threshold = 4.5 if col_name.endswith('CENTRE') else 5
+
             # Create a formula that checks if the cell is empty or not a number
             col_letter = get_column_letter(col_idx)
             range_str = f"{col_letter}2:{col_letter}{ws.max_row}"
@@ -306,6 +313,15 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
                     formula=[f'OR(ISBLANK({col_letter}2), NOT(ISNUMBER({col_letter}2)))'],
                     stopIfTrue=True,
                     fill=red_fill
+                )
+            )
+
+            # Add conditional formatting rule for numerical values smaller than the determined threshold
+            ws.conditional_formatting.add(
+                range_str,
+                FormulaRule(
+                    formula=[f'AND(ISNUMBER({col_letter}2), {col_letter}2<{threshold})'],
+                    font=red_font
                 )
             )
 
