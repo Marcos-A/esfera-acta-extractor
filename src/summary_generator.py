@@ -82,7 +82,7 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
     with pd.ExcelWriter(output_summary_path, engine='openpyxl') as writer:
         summary_df.to_excel(writer, index=False, sheet_name='Summary')
 
-    print(f"[INFO summary_generator] Summary report created: {output_summary_path}")
+    # print(f"[INFO summary_generator] Summary report created: {output_summary_path}")
 
     # Find the actual student column name (case-insensitive)
     student_col_actual_name = None
@@ -118,6 +118,14 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
 
         thin_border_side = Side(border_style="thin", color="000000")
         thin_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+
+        # Define standard row height
+        STANDARD_ROW_HEIGHT = 25 # Define the standard row height here
+
+        # Set row heights for all rows
+        ws.row_dimensions[1].height = 40  # Header row height
+        for row_idx in range(2, ws.max_row + 1):
+            ws.row_dimensions[row_idx].height = STANDARD_ROW_HEIGHT
 
         # Format header row
         for col_idx, column_title_from_df in enumerate(summary_df.columns, 1):
@@ -261,6 +269,10 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
         
         # Add conditional formatting to highlight empty or non-numeric cells in red
         red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+        
+        # New fill for specific strings
+        orange_fill = PatternFill(start_color="FFE6CC", end_color="FFE6CC", fill_type="solid")
+
         for col_idx, col_name in enumerate(summary_df.columns, 1):
             if col_name.lower() == 'estudiant':
                 continue  # Skip student column
@@ -269,7 +281,25 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
             col_letter = get_column_letter(col_idx)
             range_str = f"{col_letter}2:{col_letter}{ws.max_row}"
             
-            # Add conditional formatting rule for empty cells
+            # Add conditional formatting rule for cells containing specific strings (PDT, EP, NA, PQ)
+            # This rule should be applied *before* the general non-numeric/empty rule
+            # because conditional formatting rules are applied in the order they are added.
+            # The stopIfTrue=True ensures that if this rule applies, the next rule is not checked.
+            ws.conditional_formatting.add(
+                range_str,
+                FormulaRule(
+                    formula=[
+                        f'OR(UPPER({col_letter}2)="PDT", '
+                        f'UPPER({col_letter}2)="EP", '
+                        f'UPPER({col_letter}2)="NA", '
+                        f'UPPER({col_letter}2)="PQ")'
+                    ],
+                    stopIfTrue=True,
+                    fill=orange_fill
+                )
+            )
+
+            # Add conditional formatting rule for empty cells or non-numeric values
             ws.conditional_formatting.add(
                 range_str,
                 FormulaRule(
@@ -350,4 +380,3 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
             except Exception as remove_e:
                 print(f"[ERROR summary_generator] Could not remove partial file {output_summary_path}: {remove_e}")
         print(f"[ERROR summary_generator] Error writing or formatting summary file {output_summary_path}: {e}")
-
