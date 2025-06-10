@@ -9,28 +9,41 @@ import pandas as pd
 def extract_records(
     melted: pd.DataFrame,
     name_col: str,
-    entry_pattern: re.Pattern
+    entry_pattern: re.Pattern,
+    print_codes: bool = False
 ) -> pd.DataFrame:
     """
     Extract RA, EM or MP code & grade pairs from each entry via regex.
     Transforms grades:
-    - Numeric grades (e.g. 'A7') are converted to integers (7)
-    - Non-numeric grades (PDT, EP, NA) are kept as strings
+    - ‘A#’ grades (e.g. 'A7') are converted to the integer 7
+    - Purely numeric grades (e.g. '8') are converted to the integer 8
+    - Other grades (PDT, EP, NA, etc.) are kept as strings
     """
+    if print_codes:
+        print(melted)
+        print(name_col)
     rows = []
     for _, row in melted.iterrows():
         for code, grade in entry_pattern.findall(row['entry']):
-            # Transform grade: convert 'A#' to integer, keep others as strings
+            # Normalize whitespace in code
+            code = re.sub(r"\s+", "", code)
+            # Transform grade
             if grade.startswith('A') and grade[1:].isdigit():
-                grade = int(grade[1:])  # Convert to integer
-            
+                # 'A7' → 7
+                grade_val = int(grade[1:])
+            elif grade.isdigit():
+                # '8' → 8
+                grade_val = int(grade)
+            else:
+                # 'PDT', 'EP', 'NA', etc.
+                grade_val = grade        
             rows.append({
                 'estudiant': row[name_col],
                 'code': code,
-                'grade': grade
+                'grade': grade_val
             })
+            
     df = pd.DataFrame(rows)
-    df['code'] = df['code'].str.replace(r"\s+", '', regex=True)
     return df
 
 
