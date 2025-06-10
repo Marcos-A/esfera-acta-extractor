@@ -11,81 +11,78 @@ import time
 def _extract_mp_codes_from_columns(columns: list[str]) -> list[str]:
     """Extracts unique 4-digit MP codes from a list of column names."""
     mp_codes = set()
-    # Matches a 4-digit MP code at the start of a column name,
-    # optionally followed by specific suffixes like _...RA, CENTRE, or EMPRESA.
-    # This also matches plain 4-digit MP codes.
     mp_pattern = re.compile(r"^(?P<code>[A-Za-z0-9]{3,5})(?:_.*RA| CENTRE| EMPRESA)?$")
     for col in columns:
         match = mp_pattern.match(col)
         if match:
-            # Ensure 'code' group exists before accessing, though pattern implies it should
-            code_match_group = match.group('code') 
-            if code_match_group:
-                code = code_match_group
-                # Explicitly exclude 'estudiant' (case-insensitive) from being an MP code
-                if code.lower() != 'estudiant':
-                    mp_codes.add(code)
+            code = match.group('code')
+            if code and code.lower() != 'estudiant':
+                mp_codes.add(code)
     return sorted(list(mp_codes))
 
-# Constants for file reading retries
 MAX_READ_ATTEMPTS = 3
 READ_RETRY_DELAY_SECONDS = 5
 
 def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
-    """Generates a summary Excel report from a detailed grade Excel file."""
     df_source = None
-    
-    # 1. Read Source XLSX with retries for temporary issues
+
     for attempt in range(1, MAX_READ_ATTEMPTS + 1):
         try:
             df_source = pd.read_excel(source_xlsx_path, sheet_name=0)
-            break  # Success, exit retry loop
+            break
         except FileNotFoundError:
-            print(f"[ERROR summary_generator] Source file not found: {source_xlsx_path}. This usually means it was deleted after being listed.")
-            return # Definite error, no retry needed for this specific case
-        except Exception as e: # Catch other errors that might be temporary (e.g., file lock, incomplete write)
+            print(f"[ERROR summary_generator] Source file not found: {source_xlsx_path}.")
+            return
+        except Exception as e:
             print(f"[WARN summary_generator] Attempt {attempt}/{MAX_READ_ATTEMPTS} failed to read '{os.path.basename(source_xlsx_path)}': {type(e).__name__} - {e}")
             if attempt < MAX_READ_ATTEMPTS:
                 print(f"Retrying in {READ_RETRY_DELAY_SECONDS} seconds...")
                 time.sleep(READ_RETRY_DELAY_SECONDS)
             else:
-                print(f"[ERROR summary_generator] All {MAX_READ_ATTEMPTS} attempts to read '{os.path.basename(source_xlsx_path)}' failed. Skipping summary for this file.")
-                return # All retries failed
+                print(f"[ERROR summary_generator] All {MAX_READ_ATTEMPTS} attempts failed. Skipping summary.")
+                return
 
     if df_source is None:
-        # This should ideally be caught by a return in the loop, but acts as a final safeguard.
-        print(f"[ERROR summary_generator] Could not load data from {source_xlsx_path} after all attempts. Skipping.")
+        print(f"[ERROR summary_generator] Could not load data from {source_xlsx_path}. Skipping.")
         return
+
+    # Detect actual student data rows by finding the first completely empty row
+    empty_row_index = df_source[df_source.isnull().all(axis=1)].index
+    if not empty_row_index.empty:
+        df_source = df_source.loc[:empty_row_index[0] - 1]
 
     all_source_columns = df_source.columns.tolist()
-
-    # 2. Identify MP Codes
     mp_codes = _extract_mp_codes_from_columns(all_source_columns)
+    mp_info_for_summary = []
 
-    mp_info_for_summary = []  # Stores dicts of {'mp_code', 'col_name', 'type_a', 'header_bg'}
-
-    # 3. Determine columns to include for each MP
     for mp_code in mp_codes:
-        # Determine type for summary and column to include
-        # Type A for summary: has a '{MP_CODE} CENTRE' column. We take this column.
-        # Type B for summary: does not have CENTRE. We take the plain '{MP_CODE}' column.
-        centre_col_name = f"{mp_code} CENTRE"
-        is_type_a_for_summary = centre_col_name in all_source_columns
+        centre_col = f"{mp_code} CENTRE"
+        if centre_col in all_source_columns:
+            mp_info_for_summary.append({'mp_code': mp_code, 'col_name': centre_col, 'type_a': True, 'header_bg': "F1C232"})
+        else:
+            plain_mp = mp_code
+            if plain_mp in all_source_columns:
+                mp_info_for_summary.append({'mp_code': mp_code, 'col_name': plain_mp, 'type_a': False, 'header_bg': "B4A7D6"})
 
-        if is_type_a_for_summary:
-            mp_info_for_summary.append({'mp_code': mp_code, 'col_name': centre_col_name, 'type_a': True, 'header_bg': "F1C232"})
-        else:  # Type B for summary
-            plain_mp_col_name = mp_code
-            if plain_mp_col_name in all_source_columns:
-                mp_info_for_summary.append({'mp_code': mp_code, 'col_name': plain_mp_col_name, 'type_a': False, 'header_bg': "B4A7D6"})
-            else:
-                print(f"[INFO summary_generator] MP {mp_code} is Type B for summary, but its plain column '{plain_mp_col_name}' not found. Skipping.")
-                continue
-
-    # 4. Construct Summary DataFrame
     if not mp_info_for_summary:
-        print(f"[INFO summary_generator] No MPs to include in summary for {source_xlsx_path}. No summary file will be generated.")
+        print(f"[INFO summary_generator] No MPs to include in summary for {source_xlsx_path}.")
         return
+
+    student_col_actual_name = next((col for col in df_source.columns if col.lower() == 'estudiant'), None)
+    if not student_col_actual_name:
+        print(f"[ERROR summary_generator] Could not find 'estudiant' column in {source_xlsx_path}.")
+        return
+
+    selected_cols = [student_col_actual_name] + [info['col_name'] for info in mp_info_for_summary]
+    summary_df = df_source[selected_cols].copy()
+    if student_col_actual_name != 'estudiant':
+        summary_df.rename(columns={student_col_actual_name: 'estudiant'}, inplace=True)
+
+    summary_df.insert(0, '#', range(1, len(summary_df) + 1))
+    with pd.ExcelWriter(output_summary_path, engine='openpyxl') as writer:
+        summary_df.to_excel(writer, index=False, sheet_name='Summary')
+
+    print(f"[INFO summary_generator] Summary report created: {output_summary_path}")
 
     # Find the actual student column name (case-insensitive)
     student_col_actual_name = None
@@ -296,30 +293,46 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
 
         # Add legend at the bottom of the sheet
         legend_start_row = ws.max_row + 2  # Leave one empty row after the data
-        
-        # Create a bold font for the legend
+
+        # Create a bold font and border for the legend
         bold_font = Font(bold=True)
-        
-        # First legend row (Type A MP)
-        ws.cell(row=legend_start_row, column=1).fill = PatternFill(start_color="F1C232", end_color="F1C232", fill_type="solid")
-        cell_a1 = ws.cell(row=legend_start_row, column=2, value="MP amb estada a l'empresa\nNOTA PONDERADA AL 90% amb 2 decimals")
-        cell_a1.font = bold_font
-        cell_a1.alignment = Alignment(wrap_text=True, vertical='center')
-        
-        # Second legend row (Type B MP)
-        ws.cell(row=legend_start_row + 1, column=1).fill = PatternFill(start_color="B4A7D6", end_color="B4A7D6", fill_type="solid")
-        cell_b1 = ws.cell(row=legend_start_row + 1, column=2, value="MP sense estada a l'empresa\nNOTA SOBRE 10 i sense decimals")
-        cell_b1.font = bold_font
-        cell_b1.alignment = Alignment(wrap_text=True, vertical='center')
-        
-        # Set row heights and column widths for the legend
-        ws.row_dimensions[legend_start_row].height = 40
-        ws.row_dimensions[legend_start_row + 1].height = 40
-        
-        # Adjust column widths to fit content
-        ws.column_dimensions['A'].width = 5  # First column (color indicator)
-        ws.column_dimensions['B'].width = 35  # Second column (text)
-        
+        centered_wrap = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        left_wrap = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        legend_entries = [
+            ("F1C232", "MP amb estada a l'empresa\nNOTA PONDERADA AL 90% amb 2 decimals"),
+            ("B4A7D6", "MP sense estada a l'empresa\nNOTA SOBRE 10 i sense decimals"),
+        ]
+
+        for i, (color, text) in enumerate(legend_entries):
+            row = legend_start_row + i
+            color_cell = ws.cell(row=row, column=1)
+            label_cell = ws.cell(row=row, column=2, value=text)
+
+            # Apply styles
+            color_cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+            color_cell.border = thin_border
+            color_cell.alignment = centered_wrap
+
+            label_cell.fill = PatternFill(fill_type=None)  # No background color
+            label_cell.font = bold_font
+            label_cell.border = thin_border
+            label_cell.alignment = left_wrap
+
+            # Set row height for visibility
+            ws.row_dimensions[row].height = 45
+
+        # Adjust column widths for legend
+        ws.column_dimensions['A'].width = 5
+        ws.column_dimensions['B'].width = 50
+
+
         # Apply borders to legend cells
         for row in range(legend_start_row, legend_start_row + 2):
             for col in [1, 2]:

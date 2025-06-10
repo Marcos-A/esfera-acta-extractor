@@ -7,6 +7,7 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill, Font, Border, Side, Alignment
 from openpyxl.formatting.rule import FormulaRule
+from typing import Optional
 
 
 def apply_row_formatting(
@@ -14,34 +15,17 @@ def apply_row_formatting(
     mp_codes_with_em: list[str],
     mp_codes: list[str],
 ) -> None:
-    """
-    Apply formatting to the percentage row:
-    - Add borders to all cells
-    - Make the header cell bold
-    - Make MP-related cells bold (CENTRE, EMPRESA, MP)
-    - Set specific background colors for different types of cells
-    - Freeze first row and first column
-    - Make student names bold
-    - Center all cells vertically and horizontally (except first column which is left-aligned)
-    - Set standard column widths based on column type
-    - Format RA headers with line break after second underscore
-    - Set appropriate row height to display multi-line text
-    - Make all content in MP CENTRE, EMPRESA, and MP columns bold
-    - Set 2 decimal places for numbers in MP CENTRE columns
-    
-    Args:
-        workbook_path: Path to the Excel workbook
-        mp_codes_with_em: List of MP codes that have EM entries
-        mp_codes: List of all MP codes
-    """
+    from openpyxl import load_workbook
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from typing import Optional
+
     wb = load_workbook(workbook_path)
     ws = wb.active
     last_row = ws.max_row
-    
-    # Freeze first row and first column
-    ws.freeze_panes = 'B2'
-    
-    # Define styles
+    ws.freeze_panes = 'C2'
+
+    # Styles
     border = Border(
         left=Side(style='thin'),
         right=Side(style='thin'),
@@ -49,152 +33,114 @@ def apply_row_formatting(
         bottom=Side(style='thin')
     )
     bold_font = Font(bold=True)
-    mp_fill = PatternFill(start_color="E9D8FD", end_color="E9D8FD", fill_type="solid")
-    ra_fill = PatternFill(start_color="C8DDFD", end_color="C8DDFD", fill_type="solid")
-    header_fill = PatternFill(start_color="B8F2E6", end_color="B8F2E6", fill_type="solid")
-    student_fill = PatternFill(start_color="D9F7F0", end_color="D9F7F0", fill_type="solid")  # 20% lighter than B8F2E6
     center_aligned = Alignment(horizontal='center', vertical='center', wrap_text=True)
     left_aligned = Alignment(horizontal='left', vertical='center')
-    
-    # Define number formats
-    TWO_DECIMAL_FORMAT = '0.00'  # Format for CENTRE columns
-    PERCENTAGE_FORMAT = '0%'     # Format for percentage cells
-    
-    # Define standard column widths
-    STUDENT_NAME_WIDTH = 40  # Width for student names column
-    MP_COLUMN_WIDTH = 15     # Width for MP-related columns (CENTRE, EMPRESA, MP)
-    RA_COLUMN_WIDTH = 12     # Width for RA grade columns (increased to fit headers)
-    
-    # Define standard row height (in points) to accommodate "AVALUACIONS PENDENTS" in two lines
-    STANDARD_ROW_HEIGHT = 30  # Increased height for all rows
-    
-    # Helper function to get column letter
-    def get_column_for_header(header: str) -> str:
-        for cell in ws[1]:  # First row
-            if cell.value:  # Check if cell has a value
-                # Remove any line breaks from both the cell value and the header for comparison
-                cell_value = str(cell.value).replace('\n', '')
-                header_clean = header.replace('\n', '')
-                if cell_value == header_clean:
-                    return get_column_letter(cell.column)
-        return None
-    
-    # Helper function to format RA header with line break
+
+    # Fill colors
+    gray_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    type_a_fill = PatternFill(start_color="F1C232", end_color="F1C232", fill_type="solid")
+    type_b_fill = PatternFill(start_color="B4A7D6", end_color="B4A7D6", fill_type="solid")
+    alt_fill_even = PatternFill(start_color="D9EAD3", end_color="D9EAD3", fill_type="solid")
+    alt_fill_odd = PatternFill(start_color="B6D7A8", end_color="B6D7A8", fill_type="solid")
+
+    # Dimensions
+    STUDENT_NAME_WIDTH = 40
+    MP_COLUMN_WIDTH = 15
+    RA_COLUMN_WIDTH = 12
+    STANDARD_ROW_HEIGHT = 25
+
     def format_ra_header(header: str) -> str:
-        if not header:
+        if not header or header.count('_') < 2:
             return header
-        
-        # Count underscores to ensure we have at least two
-        underscore_count = header.count('_')
-        if underscore_count < 2:
-            return header
-            
-        # Find the position of the second underscore
-        first_pos = header.find('_')
-        second_pos = header.find('_', first_pos + 1)
-        
-        # Insert line break after second underscore
-        return f"{header[:second_pos + 1]}\n{header[second_pos + 1:]}"
-    
-    # Make first column header uppercase
-    ws['A1'].value = str(ws['A1'].value).upper()
-    
-    # Set row height for student data rows (all rows except header)
-    for row in range(2, last_row+1):
-        ws.row_dimensions[row].height = STANDARD_ROW_HEIGHT
-    
-    # Set increased height for header row to accommodate wrapped RA headers
-    ws.row_dimensions[1].height = 45  # Header row needs more height for wrapped RA codes
-    
-    # Apply formatting to all cells (only up to last_row, not last_row+1)
-    for row in ws.iter_rows(min_row=1, max_row=last_row):
-        for cell in row:
-            # Add borders to all cells
-            cell.border = border
-            
-            if cell.column == 1:  # First column (student names)
-                cell.alignment = left_aligned
-                cell.font = bold_font
-                if cell.row > 1:  # Student names only (not header)
-                    cell.fill = student_fill
-                if cell.row == 1:  # Header row
-                    cell.fill = header_fill
-            else:  # All other columns
-                cell.alignment = center_aligned
-                if cell.row == 1:  # Header row
-                    # Check if it's an RA header and format it
-                    header_value = str(cell.value)
-                    for mp_code in mp_codes:
-                        if header_value.startswith(f'{mp_code}_'):
-                            cell.value = format_ra_header(header_value)
-                            break
-                    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-                    cell.fill = header_fill
-    
-    # Apply formatting to MP-related columns
-    for mp_code in mp_codes:
-        if mp_code in mp_codes_with_em:
-            # Format MP CENTRE column
-            centre_col = get_column_for_header(f'{mp_code} CENTRE')
-            if centre_col:
-                # Apply to all cells in the column (except header)
-                for row in range(2, last_row+1):  # Skip header
-                    cell = ws[f'{centre_col}{row}']
-                    cell.font = bold_font
-                    cell.number_format = TWO_DECIMAL_FORMAT
-            
-            # Format MP EMPRESA column
-            empresa_col = get_column_for_header(f'{mp_code} EMPRESA')
-            if empresa_col:
-                # Apply to all cells in the column (except header)
-                for row in range(2, last_row+1):
-                    cell = ws[f'{empresa_col}{row}']
-                    cell.font = bold_font
-            
-            # Format MP column
-            mp_col = get_column_for_header(mp_code)
-            if mp_col:
-                # Apply to all cells in the column (except header)
-                for row in range(2, last_row+1):
-                    cell = ws[f'{mp_col}{row}']
-                    cell.font = bold_font
-        else:
-            # Format MP column for Type B MPs
-            mp_col = get_column_for_header(mp_code)
-            if mp_col:
-                # Apply to all cells in the column (except header)
-                for row in range(2, last_row+1):
-                    cell = ws[f'{mp_col}{row}']
-                    cell.font = bold_font
-    
-    # Set column widths based on column type
-    # First, set width for student names column
-    ws.column_dimensions['A'].width = STUDENT_NAME_WIDTH
-    
-    # Set widths for all other columns
-    for cell in ws[1]:  # Iterate through header row
-        if cell.column == 1:  # Skip first column (already handled)
-            continue
-            
-        column = get_column_letter(cell.column)
-        header_value = str(cell.value)
-        
-        # Check if it's an MP-related column
-        is_mp_column = False
+        first = header.find('_')
+        second = header.find('_', first + 1)
+        return f"{header[:second + 1]}\n{header[second + 1:]}"
+
+    def get_mp_for_ra(ra_header: str) -> Optional[str]:
         for mp_code in mp_codes:
-            if (mp_code in header_value and 
-                (' CENTRE' in header_value or 
-                 ' EMPRESA' in header_value or 
-                 header_value == mp_code)):
-                is_mp_column = True
-                break
+            if ra_header.startswith(mp_code + "_") and ra_header.endswith("RA"):
+                return mp_code
+        return None
+
+    # Adjust header row
+    ws['A1'].value = "#"
+    ws['B1'].value = "ESTUDIANT"
+
+    ws.row_dimensions[1].height = 40
+    for row_idx in range(2, last_row + 1):
+        ws.row_dimensions[row_idx].height = STANDARD_ROW_HEIGHT
+
+    for row in ws.iter_rows(min_row=1, max_row=last_row):
+        row_idx = row[0].row
+        for cell in row:
+            col_letter = get_column_letter(cell.column)
+            val = str(cell.value).strip() if cell.value else ""
+            cell.border = border
+
+            if row_idx == 1:
+                cell.font = bold_font
+                if col_letter == 'A' or col_letter == 'B':
+                    cell.fill = gray_fill
+                    cell.alignment = center_aligned if col_letter == 'A' else left_aligned
+                elif val in mp_codes:
+                    cell.fill = type_a_fill if val in mp_codes_with_em else type_b_fill
+                    cell.alignment = center_aligned
+                elif any(val == f"{mp} CENTRE" or val == f"{mp} EMPRESA" for mp in mp_codes_with_em):
+                    cell.fill = type_a_fill
+                    cell.alignment = center_aligned
+                elif get_mp_for_ra(val):
+                    mp_code = get_mp_for_ra(val)
+                    if mp_code:
+                        cell.fill = type_a_fill if mp_code in mp_codes_with_em else type_b_fill
+                        cell.value = format_ra_header(val)
+                        cell.alignment = center_aligned
+                else:
+                    cell.alignment = center_aligned
+            else:
+                cell.fill = alt_fill_even if (row_idx % 2 == 0) else alt_fill_odd
+                if col_letter == 'A':
+                    cell.font = bold_font
+                    cell.alignment = center_aligned
+                elif col_letter == 'B':
+                    cell.font = bold_font
+                    cell.alignment = left_aligned
+                else:
+                    cell.alignment = center_aligned
+
+    # Column widths
+    ws.column_dimensions['A'].width = 6
+    ws.column_dimensions['B'].width = STUDENT_NAME_WIDTH
+    for cell in ws[1][2:]:
+        col_letter = get_column_letter(cell.column)
+        val = str(cell.value).strip() if cell.value else ""
+        if val in mp_codes:
+            ws.column_dimensions[col_letter].width = MP_COLUMN_WIDTH
+        elif any(val == f"{mp} CENTRE" or val == f"{mp} EMPRESA" for mp in mp_codes_with_em):
+            ws.column_dimensions[col_letter].width = MP_COLUMN_WIDTH
+        elif get_mp_for_ra(val):
+            ws.column_dimensions[col_letter].width = RA_COLUMN_WIDTH
+        else:
+            ws.column_dimensions[col_letter].width = RA_COLUMN_WIDTH
+
+    # Insert legend after student list with one empty row in between
+    legend_start_row = last_row + 2
+
+    for offset, (fill, text) in enumerate([
+        (type_a_fill, "MP amb estada a l'empresa"),
+        (type_b_fill, "MP sense estada a l'empresa")
+    ]):
+        row = legend_start_row + offset
+        ws.row_dimensions[row].height = STANDARD_ROW_HEIGHT
+        cell1 = ws.cell(row=row, column=1)
+        cell2 = ws.cell(row=row, column=2, value=text)
         
-        # Set column width based on type
-        if is_mp_column:
-            ws.column_dimensions[column].width = MP_COLUMN_WIDTH
-        else:  # RA columns
-            ws.column_dimensions[column].width = RA_COLUMN_WIDTH
-    
+        cell1.fill = fill
+        cell2.fill = PatternFill(fill_type=None)  # No fill
+        for cell in (cell1, cell2):
+            cell.border = border
+            cell.font = bold_font
+            cell.alignment = center_aligned if cell.column == 1 else Alignment(wrap_text=True, vertical='center')
+
     wb.save(workbook_path)
 
 
@@ -204,156 +150,82 @@ def apply_conditional_formatting(
     mp_codes_with_em: list[str],
     mp_codes: list[str]
 ) -> None:
-    """
-    Apply conditional formatting rules to highlight:
-    - For RA columns:
-        * Red background if not a number
-        * Red text if number is not in range 1-10
-        * Red background in last row if percentage cell is blank
-        * Red text in last row if percentage is 0%
-    - Red text for percentage error messages in MP CENTRE and MP columns
-    - Red text for "NO SUPERAT" message
-    - Red text for "AVALUACIONS PENDENTS" in MP CENTRE and MP columns
-    - Red text for MP CENTRE columns if not 90%
-    - Red text for MP columns if not 100%
-    
-    Args:
-        workbook_path: Path to the Excel workbook
-        mp_groups: Dictionary mapping MP codes to their RA codes
-        mp_codes_with_em: List of MP codes that have EM entries
-        mp_codes: List of all MP codes
-    """
+    from openpyxl import load_workbook
+    from openpyxl.formatting.rule import FormulaRule
+    from openpyxl.styles import PatternFill, Font
+    from openpyxl.utils import get_column_letter
+
     wb = load_workbook(workbook_path)
     ws = wb.active
-    last_row = ws.max_row
-    
-    # Helper function to get column letter, handling line breaks in headers
+    last_student_row = ws.max_row - 3  # 1 empty row + 2 legend rows
+
+    red_fill = PatternFill(start_color="FFD9D9", end_color="FFD9D9", fill_type="solid")
+    orange_fill = PatternFill(start_color="FFE6CC", end_color="FFE6CC", fill_type="solid")
+    red_font = Font(color="FF0000")
+
     def get_column_for_header(header: str) -> str:
-        for cell in ws[1]:  # First row
-            if cell.value:  # Check if cell has a value
-                # Remove any line breaks from both the cell value and the header for comparison
-                cell_value = str(cell.value).replace('\n', '')
-                header_clean = header.replace('\n', '')
-                if cell_value == header_clean:
-                    return get_column_letter(cell.column)
+        header_clean = str(header).replace('\n', '')
+        for cell in ws[1]:
+            if cell.value and str(cell.value).replace('\n', '') == header_clean:
+                return get_column_letter(cell.column)
         return None
-    
-    red_font = Font(color="FF0000")  # Red color
-    red_fill = PatternFill(start_color="FFD9D9", end_color="FFD9D9", fill_type="solid")  # Light red background
-    
-    # Format RA columns
+
+    def apply_rules_to_column(col_letter: str):
+        for row in range(2, last_student_row + 1):
+            cell_ref = f'{col_letter}{row}'
+
+            # Orange fill: PDT, EP, NA, PQ (case-insensitive)
+            orange_rule = FormulaRule(
+                formula=[f'OR('
+                         f'ISNUMBER(SEARCH("PDT",{cell_ref})),'
+                         f'ISNUMBER(SEARCH("EP",{cell_ref})),'
+                         f'ISNUMBER(SEARCH("NA",{cell_ref})),'
+                         f'ISNUMBER(SEARCH("PQ",{cell_ref}))'
+                         f')'],
+                fill=orange_fill,
+                stopIfTrue=True
+            )
+            ws.conditional_formatting.add(cell_ref, orange_rule)
+
+            # Red fill for invalid entries (non-number and not one of the above)
+            red_fill_rule = FormulaRule(
+                formula=[f'AND(NOT(ISNUMBER({cell_ref})),'
+                         f'ISERROR(SEARCH("PDT",{cell_ref})),'
+                         f'ISERROR(SEARCH("EP",{cell_ref})),'
+                         f'ISERROR(SEARCH("NA",{cell_ref})),'
+                         f'ISERROR(SEARCH("PQ",{cell_ref})))'],
+                fill=red_fill,
+                stopIfTrue=True
+            )
+            ws.conditional_formatting.add(cell_ref, red_fill_rule)
+
+            # Red font if number < 5
+            red_font_rule = FormulaRule(
+                formula=[f'AND(ISNUMBER({cell_ref}), {cell_ref}<5)'],
+                font=red_font,
+                stopIfTrue=True
+            )
+            ws.conditional_formatting.add(cell_ref, red_font_rule)
+
+    # Apply to RA columns
     for mp_code in mp_codes:
-        for ra in mp_groups[mp_code]:
-            col = get_column_for_header(ra)
-            if col:
-                # Apply rules to student grade cells (all rows except header and last row)
-                for row in range(2, last_row+1):  # Start from row 2 (skip header)
-                    cell_range = f'{col}{row}'
-                    
-                    # Red background if not a number (including empty cells)
-                    non_numeric_rule = FormulaRule(
-                        formula=[f'OR(ISBLANK({cell_range}), NOT(ISNUMBER({cell_range})))'],
-                        stopIfTrue=True,
-                        fill=red_fill
-                    )
-                    ws.conditional_formatting.add(cell_range, non_numeric_rule)
-                    
-                    # Red text if number is not in range 1-10
-                    out_of_range_rule = FormulaRule(
-                        formula=[f'AND(ISNUMBER({cell_range}), OR({cell_range}<1, {cell_range}>10))'],
-                        stopIfTrue=True,
-                        font=red_font
-                    )
-                    ws.conditional_formatting.add(cell_range, out_of_range_rule)
-                    
-                    # Red text if number is less than 5
-                    less_than_five_rule = FormulaRule(
-                        formula=[f'AND(ISNUMBER({cell_range}), {cell_range}<5)'],
-                        stopIfTrue=True,
-                        font=red_font
-                    )
-                    ws.conditional_formatting.add(cell_range, less_than_five_rule)
-    
+        for ra_code in mp_groups.get(mp_code, []):
+            col_letter = get_column_for_header(ra_code)
+            if col_letter:
+                apply_rules_to_column(col_letter)
+
+    # Apply to MP-related columns (CENTRE, EMPRESA, MP)
+    for mp_code in mp_codes:
+        related_headers = [mp_code]
+        if mp_code in mp_codes_with_em:
+            related_headers.insert(0, f"{mp_code} EMPRESA")
+            related_headers.insert(0, f"{mp_code} CENTRE")
+        for header in related_headers:
+            col_letter = get_column_for_header(header)
+            if col_letter:
+                apply_rules_to_column(col_letter)
+
     wb.save(workbook_path)
-
-
-# def apply_mp_sum_formulas(
-#     workbook_path: str,
-#     mp_groups: dict[str, list[str]],
-#     mp_codes_with_em: list[str],
-#     mp_codes: list[str]
-# ) -> None:
-#     """
-#     Apply Excel formulas to calculate MP sums in the last row and SUMPRODUCT for student grades.
-#     For MPs with EM:
-#     - MP CENTRE column:
-#       * Checks if RA percentages sum to 90%, shows error if not
-#       * Shows "NO SUPERAT" if any RA grade is below 5
-#       * For students: checks if all values are valid numbers using COUNT
-#       * For percentage row: sums all RA percentages    
-#     Args:
-#         workbook_path: Path to the Excel workbook
-#         mp_groups: Dictionary mapping MP codes to their RA codes
-#         mp_codes_with_em: List of MP codes that have EM entries
-#         mp_codes: List of all MP codes
-#     """
-#     wb = load_workbook(workbook_path)
-#     ws = wb.active
-#     last_row = ws.max_row
-    
-#     # Helper function to get column letter
-#     def get_column_for_header(header: str) -> str:
-#         # Ensure header is a string before attempting string operations
-#         header_str = str(header) if header is not None else ""
-#         for cell in ws[1]:  # First row
-#             if cell.value:
-#                 # Ensure cell.value is a string before attempting string operations
-#                 cell_value_str = str(cell.value) if cell.value is not None else ""
-#                 # Replace both \n and \r (Windows newline)
-#                 cell_value_clean = cell_value_str.replace('\n', '').replace('\r', '')
-#                 header_clean = header_str.replace('\n', '').replace('\r', '')
-#                 if cell_value_clean == header_clean:
-#                     return get_column_letter(cell.column)
-#         return None
-    
-#     # For each MP, create appropriate formulas
-#     for mp_code in mp_codes:
-#         ra_codes = mp_groups.get(mp_code, []) # Use .get for safety
-#         ra_columns = [get_column_for_header(ra) for ra in ra_codes]
-#         ra_columns = [col for col in ra_columns if col is not None]
-        
-#         if ra_columns:
-#             first_ra_col = ra_columns[0]
-#             last_ra_col = ra_columns[-1]
-            
-#             failing_grades_check_parts = []
-#             for ra_col in ra_columns:
-#                 failing_grades_check_parts.append(f'AND(ISNUMBER({ra_col}{{row}}),{ra_col}{{row}}<5)')
-#             any_failing = f'OR({",".join(failing_grades_check_parts)})'
-            
-#             if mp_code in mp_codes_with_em:
-#                 centre_column = get_column_for_header(f'{mp_code} CENTRE')
-#                 empresa_column = get_column_for_header(f'{mp_code} EMPRESA')
-#                 mp_column_em = get_column_for_header(mp_code) # Renamed to avoid conflict
-
-#                 if centre_column:
-#                     for row_idx in range(2, last_row+1): # Student rows
-#                         cell = ws[f'{centre_column}{row_idx}']
-#                         cell.value = None
-                
-#                 if mp_column_em and centre_column and empresa_column: # Ensure all columns found
-#                     for row_idx in range(2, last_row+1): # Student rows
-#                         cell = ws[f'{mp_column_em}{row_idx}']
-#                         cell.value = None
-
-#             else: # Regular MPs (Type B)
-#                 mp_column_regular = get_column_for_header(mp_code) # Renamed to avoid conflict
-#                 if mp_column_regular:
-#                     for row_idx in range(2, last_row+1): # Student rows
-#                         cell = ws[f'{mp_column_regular}{row_idx}']
-#                         cell.value = None
-    
-#     wb.save(workbook_path)
 
 
 def export_excel_with_spacing(
@@ -364,55 +236,29 @@ def export_excel_with_spacing(
 ) -> None:
     """
     Export DataFrame to Excel with specific column spacing after each MP's RAs.
-    - 3 empty columns after MPs with EM (named: MP CENTRE, MP EMPRESA, MP)
-    - 1 empty column after other MPs (named: MP)
-    - Uses Excel formulas to dynamically sum RA percentages for each MP
-    - Applies data validation for percentage cells
-    - Applies conditional formatting for invalid grades
-    - Protects all cells except RA percentage cells
-    Uses pre-computed mp_codes list for efficient grouping.
+    Adds a "#" column with sequential numbers at the beginning.
     """
-    # Filter out MP grade columns (those that don't end with EM or RA)
-    # and exclude the 'estudiant' column from processing
     non_mp_columns = [col for col in df.columns 
                          if col.endswith(('EM', 'RA')) or col == 'estudiant']
-    # Remove suffixes from MP grade columns
-    df = df.rename(
-        columns=lambda col: col.split('_')[0] if col not in non_mp_columns else col
-    )
-    # Get MP grade columns
+    df = df.rename(columns=lambda col: col.split('_')[0] if col not in non_mp_columns else col)
     mp_grade_columns = [col for col in df.columns if not col.endswith('EM') and
                          not col.endswith('RA') and col != 'estudiant']
-    # Create a filtered DataFrame with non-MP grade columns
     df_without_mp_grades = df[non_mp_columns].copy()
     
-    # Get the current column order (excluding 'estudiant')
     ra_codes = [col for col in df_without_mp_grades.columns if col != 'estudiant']
     
-    # Group RA codes by their MP. Sort mp_codes by length descending to match longer MPs first.
-    # Use startswith(mp_code + '_') for more precise matching.
     mp_groups = {mp: [] for mp in mp_codes}
-    sorted_mp_codes = sorted(mp_codes, key=len, reverse=True)  # Sort MPs by length
-
+    sorted_mp_codes = sorted(mp_codes, key=len, reverse=True)
     for ra_code in ra_codes:
-        found_mp = False
         for mp_code in sorted_mp_codes:
-            if ra_code.startswith(mp_code + '_'):  # Precise matching
+            if ra_code.startswith(mp_code + '_'):
                 mp_groups[mp_code].append(ra_code)
-                found_mp = True
                 break
-        if not found_mp and not ra_code.endswith(('EM', 'RA')):
-            # Only warn for non-EM, non-RA codes that don't match any MP
-            print(f"Warning: Code '{ra_code}' did not match any known MP code prefix and is not an EM/RA code.")
     
-    # Add empty spacing columns with explicit numeric type for calculations
-    new_columns = ['estudiant']  # Start with student name column
+    new_columns = ['estudiant']
     for mp_code in mp_codes:
-        # Add RA columns for this MP
         for ra in mp_groups[mp_code]:
             new_columns.append(ra)
-        
-        # Add spacing columns based on whether this MP has EM
         if mp_code in mp_codes_with_em:
             new_columns.extend([
                 f'{mp_code} CENTRE',
@@ -422,96 +268,68 @@ def export_excel_with_spacing(
         else:
             new_columns.append(f'{mp_code}')
     
-    # Start with the filtered DataFrame that only contains valid grade columns
     export_df = df_without_mp_grades.copy()
 
-    # Create a mapping of EM codes to their corresponding MP codes
     em_to_mp = {}
     for mp_code in mp_codes_with_em:
-        # Find all EM codes for this MP (format: MP_CF_1EM or MP_CF_12EM)
         em_codes = [col for col in export_df.columns if col.startswith(f'{mp_code}_') and col.endswith('EM')]
         for em_code in em_codes:
             em_to_mp[em_code] = mp_code
     
-    # Add new placeholder columns (MP, CENTRE, EMPRESA) if they don't exist
     for col_name in new_columns:
         if col_name not in export_df.columns:
             export_df[col_name] = pd.Series(dtype='float64', index=export_df.index)
     
-    # Ensure all columns from new_columns are present and in the correct order
     export_df = export_df.reindex(columns=new_columns)
 
-    print(mp_grade_columns)
     for mp_code in mp_grade_columns:
-        print(mp_code)
         if mp_code in export_df.columns:
-            print("Found")
-            # `df` here is still the renamed DataFrame, which has the original
-            # grade values under column `mp_code`
             export_df[mp_code] = df[mp_code]
-    print(export_df.iloc[:, :14])
-    # First, export the DataFrame to Excel
+
+    # Add sequential index column
+    export_df.insert(0, '#', range(1, len(export_df) + 1))
+
     output_path = output_path.replace('.csv', '.xlsx')
     export_df.to_excel(output_path, index=False)
-    
-    # Now process EM records in the Excel file
+
     wb = load_workbook(output_path)
     ws = wb.active
-    
-    # Helper function to get column letter for a header
+
     def get_col_letter(header):
         for cell in ws[1]:
             if str(cell.value).strip() == header:
                 return get_column_letter(cell.column)
         return None
-    
-    # Process EM records if there are any
+
     if em_to_mp:
         for em_code, mp_code in em_to_mp.items():
             empresa_header = f'{mp_code} EMPRESA'
             em_col = get_col_letter(em_code)
             empresa_col = get_col_letter(empresa_header)
-            
             if em_col and empresa_col:
-                # Copy EM grades to EMPRESA column
                 for row_idx in range(2, ws.max_row + 1):
                     em_cell = ws[f'{em_col}{row_idx}']
                     empresa_cell = ws[f'{empresa_col}{row_idx}']
                     if em_cell.value is not None:
                         empresa_cell.value = em_cell.value
-                
-                # Remove the original EM column
                 ws.delete_cols(ws[em_col][0].column, 1)
-        
-        # Save the workbook after processing all EM records
         wb.save(output_path)
-    
-    # Remove EM codes from mp_groups to avoid processing them as RA columns
+
     for em_code in em_to_mp:
         mp_code = em_to_mp[em_code]
         if mp_code in mp_groups and em_code in mp_groups[mp_code]:
             mp_groups[mp_code].remove(em_code)
-    
-    # Reload the DataFrame to reflect any changes
+
     export_df = pd.read_excel(output_path)
-    
-    # Convert numeric columns to float64 explicitly
     numeric_cols = export_df.select_dtypes(include=['int64', 'float64']).columns
     for col in numeric_cols:
-        # Convert to float64 with NaN for missing values
         export_df[col] = pd.to_numeric(export_df[col], errors='coerce').astype('float64')
-    
-    # Replace NaN with empty string only in non-numeric columns
+
     non_numeric_cols = export_df.columns.difference(numeric_cols)
     export_df[non_numeric_cols] = export_df[non_numeric_cols].fillna('')
-    
-    # Export the final DataFrame to Excel
+
     export_df.to_excel(output_path, index=False)
 
-    # Apply row formatting (borders, bold, background colors)
     apply_row_formatting(output_path, mp_codes_with_em, mp_codes)
-    
-    # Apply conditional formatting (now without percentage validation)
     apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes)
-    
     print(f"\t- Exported {len(export_df)} entries to {output_path}")

@@ -108,7 +108,7 @@ def process_pdf(pdf_path: str) -> None:
         _                                         # exactly one underscore
         [A-Za-z0-9]{4,5})                         # CF code format
         \s\(\d\)\s*-\s*                           # round (convocatòria)
-        (?P<grade>A\d{1,2} | PDT | EP | NA | PQ)  # grade options: A#, PDT, EP, NA, PQ
+        (?P<grade>A\d{1,2}|PDT|EP|NA|PQ)          # grade options: A#, PDT, EP, NA, PQ
         (?!\S)                                    # must end at whitespace or EOF
         """,
         flags=re.VERBOSE | re.IGNORECASE
