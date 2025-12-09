@@ -1,0 +1,13 @@
+{
+    // 1. Tell the editor where your entry point is
+    "projectRoot": ".",
+    
+    // 2. AI settings: preload ensures these files are read into every prompt
+    "ai": {
+    "preload": [
+      { "path": "./windsurf.local.jsonc",     "optional": true           },  // Optional local Windsurf config
+      { "path": "./rules/column-context.md",  "alias": "column-context"  }
+      ]
+    }
+  }
+  
