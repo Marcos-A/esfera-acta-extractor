@@ -125,6 +125,21 @@ docker build -t esfera-acta-extractor .
    exit
    ```
 
+    Optional: control how the string `NA` is treated in Excel cells:
+
+    - By default the tool **preserves** the literal `NA` string (it will appear as `NA` in the Excel and receive the corresponding conditional formatting).
+    - To restore the previous behaviour (treat `NA` as a missing value and convert it to an empty cell), set the environment variable `PRESERVE_NA=0` before running.
+
+    Example (keep `NA`):
+    ```bash
+    python esfera-acta-extractor.py
+    ```
+
+    Example (treat `NA` as empty, legacy behaviour):
+    ```bash
+    PRESERVE_NA=0 python esfera-acta-extractor.py
+    ```
+
 **Note**: The script will:
 - Look for PDF files in the `01_source_pdfs` directory
 - Process each PDF file individually

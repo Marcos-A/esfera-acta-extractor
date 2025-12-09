@@ -148,7 +148,8 @@ def apply_conditional_formatting(
     workbook_path: str,
     mp_groups: dict[str, list[str]],
     mp_codes_with_em: list[str],
-    mp_codes: list[str]
+    mp_codes: list[str],
+    preserve_na: bool = True
 ) -> None:
     from openpyxl import load_workbook
     from openpyxl.formatting.rule import FormulaRule
@@ -174,30 +175,51 @@ def apply_conditional_formatting(
         for row in range(2, last_student_row + 1):
             cell_ref = f'{col_letter}{row}'
 
-            # Orange fill: PDT, EP, NA, PQ (case-insensitive)
+            # Orange fill: PDT, EP, PQ (and NA only when not preserving NA)
+            if preserve_na:
+                orange_formula = (
+                    f'OR(ISNUMBER(SEARCH("PDT",{cell_ref})),'
+                    f'ISNUMBER(SEARCH("EP",{cell_ref})),'
+                    f'ISNUMBER(SEARCH("PQ",{cell_ref})))'
+                )
+            else:
+                orange_formula = (
+                    f'OR(ISNUMBER(SEARCH("PDT",{cell_ref})),'
+                    f'ISNUMBER(SEARCH("EP",{cell_ref})),'
+                    f'ISNUMBER(SEARCH("NA",{cell_ref})),'
+                    f'ISNUMBER(SEARCH("PQ",{cell_ref})))'
+                )
+
             orange_rule = FormulaRule(
-                formula=[f'OR('
-                         f'ISNUMBER(SEARCH("PDT",{cell_ref})),'
-                         f'ISNUMBER(SEARCH("EP",{cell_ref})),'
-                         f'ISNUMBER(SEARCH("NA",{cell_ref})),'
-                         f'ISNUMBER(SEARCH("PQ",{cell_ref}))'
-                         f')'],
+                formula=[orange_formula],
                 fill=orange_fill,
                 stopIfTrue=True
             )
             ws.conditional_formatting.add(cell_ref, orange_rule)
 
             # Red fill for invalid entries (non-number and not one of the above)
+            red_fill_formula = (
+                f'AND(NOT(ISNUMBER({cell_ref})),'
+                f'ISERROR(SEARCH("PDT",{cell_ref})),'
+                f'ISERROR(SEARCH("EP",{cell_ref})),'
+                f'ISERROR(SEARCH("PQ",{cell_ref})))'
+            )
+
             red_fill_rule = FormulaRule(
-                formula=[f'AND(NOT(ISNUMBER({cell_ref})),'
-                         f'ISERROR(SEARCH("PDT",{cell_ref})),'
-                         f'ISERROR(SEARCH("EP",{cell_ref})),'
-                         f'ISERROR(SEARCH("NA",{cell_ref})),'
-                         f'ISERROR(SEARCH("PQ",{cell_ref})))'],
+                formula=[red_fill_formula],
                 fill=red_fill,
                 stopIfTrue=True
             )
             ws.conditional_formatting.add(cell_ref, red_fill_rule)
+
+            # If preserving NA, add an explicit rule to mark literal "NA" as invalid
+            if preserve_na:
+                na_red_rule = FormulaRule(
+                    formula=[f'UPPER({cell_ref})="NA"'],
+                    fill=red_fill,
+                    stopIfTrue=True
+                )
+                ws.conditional_formatting.add(cell_ref, na_red_rule)
 
             # Red font if number < 5
             red_font_rule = FormulaRule(
@@ -232,21 +254,25 @@ def export_excel_with_spacing(
     df: pd.DataFrame,
     output_path: str,
     mp_codes_with_em: list[str],
-    mp_codes: list[str]
+    mp_codes: list[str],
+    preserve_na: bool = True,
 ) -> None:
     """
     Export DataFrame to Excel with specific column spacing after each MP's RAs.
     Adds a "#" column with sequential numbers at the beginning.
+
+    preserve_na: if True (default) keep literal "NA" values in the sheet.
+                 if False, use pandas default NA semantics (original behaviour).
     """
-    non_mp_columns = [col for col in df.columns 
+    non_mp_columns = [col for col in df.columns
                          if col.endswith(('EM', 'RA')) or col == 'estudiant']
     df = df.rename(columns=lambda col: col.split('_')[0] if col not in non_mp_columns else col)
     mp_grade_columns = [col for col in df.columns if not col.endswith('EM') and
                          not col.endswith('RA') and col != 'estudiant']
     df_without_mp_grades = df[non_mp_columns].copy()
-    
+
     ra_codes = [col for col in df_without_mp_grades.columns if col != 'estudiant']
-    
+
     mp_groups = {mp: [] for mp in mp_codes}
     sorted_mp_codes = sorted(mp_codes, key=len, reverse=True)
     for ra_code in ra_codes:
@@ -254,7 +280,7 @@ def export_excel_with_spacing(
             if ra_code.startswith(mp_code + '_'):
                 mp_groups[mp_code].append(ra_code)
                 break
-    
+
     new_columns = ['estudiant']
     for mp_code in mp_codes:
         for ra in mp_groups[mp_code]:
@@ -267,7 +293,7 @@ def export_excel_with_spacing(
             ])
         else:
             new_columns.append(f'{mp_code}')
-    
+
     export_df = df_without_mp_grades.copy()
 
     em_to_mp = {}
@@ -275,11 +301,11 @@ def export_excel_with_spacing(
         em_codes = [col for col in export_df.columns if col.startswith(f'{mp_code}_') and col.endswith('EM')]
         for em_code in em_codes:
             em_to_mp[em_code] = mp_code
-    
+
     for col_name in new_columns:
         if col_name not in export_df.columns:
             export_df[col_name] = pd.Series(dtype='float64', index=export_df.index)
-    
+
     export_df = export_df.reindex(columns=new_columns)
 
     for mp_code in mp_grade_columns:
@@ -315,12 +341,10 @@ def export_excel_with_spacing(
                 ws.delete_cols(ws[em_col][0].column, 1)
         wb.save(output_path)
 
-    for em_code in em_to_mp:
-        mp_code = em_to_mp[em_code]
-        if mp_code in mp_groups and em_code in mp_groups[mp_code]:
-            mp_groups[mp_code].remove(em_code)
+    # Re-read the written file once. If preserve_na is True, instruct pandas
+    # not to interpret default NA strings (so "NA" remains a literal string).
+    export_df = pd.read_excel(output_path, keep_default_na=(not preserve_na))
 
-    export_df = pd.read_excel(output_path)
     numeric_cols = export_df.select_dtypes(include=['int64', 'float64']).columns
     for col in numeric_cols:
         export_df[col] = pd.to_numeric(export_df[col], errors='coerce').astype('float64')
@@ -331,5 +355,5 @@ def export_excel_with_spacing(
     export_df.to_excel(output_path, index=False)
 
     apply_row_formatting(output_path, mp_codes_with_em, mp_codes)
-    apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes)
+    apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes, preserve_na=preserve_na)
     print(f"\t- Exported {len(export_df)} entries to {output_path}")

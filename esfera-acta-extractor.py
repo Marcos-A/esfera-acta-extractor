@@ -36,6 +36,11 @@ from src import (
 from src.excel_processor import export_excel_with_spacing
 import glob
 
+# Preserve NA setting: default is to preserve literal "NA" values.
+# Set environment variable `PRESERVE_NA=0` or `PRESERVE_NA=false` to restore
+# the previous behaviour (treat "NA" as missing and blank it).
+PRESERVE_NA = os.getenv('PRESERVE_NA', '1').lower() not in ('0', 'false', 'no')
+
 
 def process_pdf(pdf_path: str) -> None:
     """
@@ -73,42 +78,40 @@ def process_pdf(pdf_path: str) -> None:
     # 9) Extract RA records using original entry_pattern
     ra_entry_pattern = re.compile(
         r"""
-        (?P<code>[A-Za-z0-9]{3,5}                # MP code format
-        _               
-        [A-Za-z0-9]{4,5}                         # CF code format
-        _                       
-        \d(?:\s*\d)RA)                           # RA
-        \s\(\d\)\s*-\s*                          # round (convocatòria)
-        (?P<grade>A\d{1,2}|PDT|EP|NA)            # grade options: A#, PDT, EP, NA
+        (?P<code>[A-Za-z0-9]{3,5}                  # MP code format
+        _
+        [A-Za-z0-9 ]{4,5}                          # CF code format
+        \s*_                                       # optional spaces before underscore to RA
+        \d(?:\s*\d)RA)                             # RA
+        \s\(\d\)\s*-\s*                            # round (convocatòria)
+        (?P<grade>A\d{1,2}|PDT|EP|NA)?             # grade options: A#, PDT, EP, NA
         """,
         flags=re.IGNORECASE | re.VERBOSE
     )
     ra_records = extract_records(melted, name_col, ra_entry_pattern)
-
     # 10) Extract EM records using original entry_pattern
     em_entry_pattern = re.compile(
         r"""
         (?P<code>[A-Za-z0-9]{3,5}                # MP code format
         _               
-        [A-Za-z0-9]{4,5}                         # CF code format
+        [A-Za-z0-9 ]{4,5}                        # CF code format
         _                       
         \d(?:\s*\d)EM)                           # EM
         \s\(\d\)\s*-\s*                          # round (convocatòria)
-        (?P<grade>A\d{1,2}|PDT|EP|NA)            # grade options: A#, PDT, EP, NA
+        (?P<grade>A\d{1,2}|PDT|EP|NA)?           # grade options: A#, PDT, EP, NA
         """,
         flags=re.IGNORECASE | re.VERBOSE
     )
     em_records = extract_records(melted, name_col, em_entry_pattern)
-    
+
     # 11) Extract MP records using entry pattern
     mp_entry_pattern = re.compile(
         r"""
         (?<!\S)                                   # must start at whitespace or BOF
-        (?P<code>[A-Za-z0-9]{3,5}                 # MP code format
-        _                                         # exactly one underscore
-        [A-Za-z0-9]{4,5})                         # CF code format
-        \s\(\d\)\s*-\s*                           # round (convocatòria)
-        (?P<grade>A?\d{1,2}|PDT|EP|NA|PQ)         # grade options: A#, #, PDT, EP, NA, PQ
+        (?P<code>[A-Za-z0-9]{3,5}_                # MP code format + underscore
+        [A-Za-z0-9 ]{4,5})                        # CF code format
+        \s*\(\d\)\s*-\s*                          # round (convocatòria)
+        (?P<grade>A?\d{1,2}|PDT|EP|NA|PQ)?        # grade options: A#, #, PDT, EP, NA, PQ
         (?!\S)                                    # must end at whitespace or EOF
         """,
         flags=re.VERBOSE | re.IGNORECASE
@@ -142,7 +145,8 @@ def process_pdf(pdf_path: str) -> None:
     wide = wide.reset_index()
 
     # 16) Export to Excel with proper spacing between MP groups
-    export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes)
+    # Pass `preserve_na` according to environment variable `PRESERVE_NA`.
+    export_excel_with_spacing(wide, output_xlsx, mp_codes_with_em, mp_codes, preserve_na=PRESERVE_NA)
 
 
 def main() -> None:
@@ -160,7 +164,7 @@ def main() -> None:
         return
 
     for pdf_file in pdf_files:
-        print(f"\Extracting data from {pdf_file}...")
+        print(f"Extracting data from {pdf_file}...")
         try:
             process_pdf(pdf_file)
             print(f"\t- Successfully extracted data from {pdf_file}")

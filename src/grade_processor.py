@@ -38,7 +38,6 @@ def extract_records(
                 'code': code,
                 'grade': grade_val
             })
-            
     df = pd.DataFrame(rows)
     return df
 
@@ -61,7 +60,7 @@ def find_mp_codes_with_em(melted: pd.DataFrame, mp_codes: list[str]) -> list[str
         r"""
         (?P<code>[A-Za-z0-9]{3,5}               # MP code format
         _               
-        [A-Za-z0-9]{4,5}                        # CF code format
+        [A-Za-z0-9 ]{4,5}                       # CF code format (allow spaces)
         _                       
         \d(?:\s*\d)EM)                          # EM
         \s\(\d\)                                # round (convocatòria)
@@ -80,7 +79,8 @@ def find_mp_codes_with_em(melted: pd.DataFrame, mp_codes: list[str]) -> list[str
             
         # Extract MP codes from EM entries
         for code in em_entry_pattern.findall(str(entry)):
-            mp_match = mp_pattern.match(code)
+            code_no_space = re.sub(r"\s+", "", code)
+            mp_match = mp_pattern.match(code_no_space)
             if mp_match:
                 mp_code = mp_match.group(1)
                 if mp_code in mp_codes:

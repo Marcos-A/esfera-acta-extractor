@@ -120,6 +120,20 @@ Tens dues opcions per executar el contenidor:
    ```bash
    python esfera-acta-extractor.py
    ```
+   Opcional: per controlar com es tracta la cadena "NA" a les cel·les d'Excel:
+
+   - Per defecte l'eina **preserva** literalment la cadena `NA` (apareixerà com a `NA` i rebreà la coloració corresponent).
+   - Si voleu el comportament antic (tractar `NA` com a valor faltant i convertir-lo a cel·la buida), establiu la variable d'entorn `PRESERVE_NA=0` abans d'executar.
+
+   Exemple (manté `NA`):
+   ```bash
+   python esfera-acta-extractor.py
+   ```
+
+   Exemple (tracta `NA` com a buit, comportament antic):
+   ```bash
+   PRESERVE_NA=0 python esfera-acta-extractor.py
+   ```
    Per sortir de la shell interactiva, simplement escriu:
    ```bash
    exit
