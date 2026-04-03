@@ -144,6 +144,7 @@ chmod +x run-local-web.sh
 First-run behavior:
 
 - if `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` still contain placeholder values, the script prompts for them and saves them into `.env.local`
+- the local container created by this script is named `esfera2excel-web-local`
 
 Both `run-local-web.sh` and `.env.local` are ignored by Git.
 

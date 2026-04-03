@@ -144,6 +144,7 @@ chmod +x run-local-web.sh
 Comportament del primer llançament:
 
 - si `TELEGRAM_BOT_TOKEN` o `TELEGRAM_CHAT_ID` encara tenen el valor de plantilla, l'script te'ls demanarà i els desarà a `.env.local`
+- el contenidor local creat per aquest script s'anomena `esfera2excel-web-local`
 
 Els fitxers `run-local-web.sh` i `.env.local` estan ignorats per Git.
 
