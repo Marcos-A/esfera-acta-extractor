@@ -149,7 +149,6 @@ def apply_conditional_formatting(
     mp_groups: dict[str, list[str]],
     mp_codes_with_em: list[str],
     mp_codes: list[str],
-    preserve_na: bool = True
 ) -> None:
     from openpyxl import load_workbook
     from openpyxl.formatting.rule import FormulaRule
@@ -175,21 +174,11 @@ def apply_conditional_formatting(
         for row in range(2, last_student_row + 1):
             cell_ref = f'{col_letter}{row}'
 
-            # Orange fill: PDT, EP, PQ (and NA only when not preserving NA)
-            if preserve_na:
-                orange_formula = (
-                    f'OR(ISNUMBER(SEARCH("PDT",{cell_ref})),'
-                    f'ISNUMBER(SEARCH("EP",{cell_ref})),'
-                    f'ISNUMBER(SEARCH("PQ",{cell_ref})))'
-                )
-            else:
-                orange_formula = (
-                    f'OR(ISNUMBER(SEARCH("PDT",{cell_ref})),'
-                    f'ISNUMBER(SEARCH("EP",{cell_ref})),'
-                    f'ISNUMBER(SEARCH("NA",{cell_ref})),'
-                    f'ISNUMBER(SEARCH("PQ",{cell_ref})))'
-                )
-
+            orange_formula = (
+                f'OR(ISNUMBER(SEARCH("PDT",{cell_ref})),'
+                f'ISNUMBER(SEARCH("EP",{cell_ref})),'
+                f'ISNUMBER(SEARCH("PQ",{cell_ref})))'
+            )
             orange_rule = FormulaRule(
                 formula=[orange_formula],
                 fill=orange_fill,
@@ -211,15 +200,6 @@ def apply_conditional_formatting(
                 stopIfTrue=True
             )
             ws.conditional_formatting.add(cell_ref, red_fill_rule)
-
-            # If preserving NA, add an explicit rule to mark literal "NA" as invalid
-            if preserve_na:
-                na_red_rule = FormulaRule(
-                    formula=[f'UPPER({cell_ref})="NA"'],
-                    fill=red_fill,
-                    stopIfTrue=True
-                )
-                ws.conditional_formatting.add(cell_ref, na_red_rule)
 
             # Red font if number < 5
             red_font_rule = FormulaRule(
@@ -255,14 +235,10 @@ def export_excel_with_spacing(
     output_path: str,
     mp_codes_with_em: list[str],
     mp_codes: list[str],
-    preserve_na: bool = True,
 ) -> None:
     """
     Export DataFrame to Excel with specific column spacing after each MP's RAs.
     Adds a "#" column with sequential numbers at the beginning.
-
-    preserve_na: if True (default) keep literal "NA" values in the sheet.
-                 if False, use pandas default NA semantics (original behaviour).
     """
     non_mp_columns = [col for col in df.columns
                          if col.endswith(('EM', 'RA')) or col == 'estudiant']
@@ -312,6 +288,8 @@ def export_excel_with_spacing(
         if mp_code in export_df.columns:
             export_df[mp_code] = df[mp_code]
 
+    export_df = _blank_literal_na(export_df)
+
     # Add sequential index column
     export_df.insert(0, '#', range(1, len(export_df) + 1))
 
@@ -341,9 +319,8 @@ def export_excel_with_spacing(
                 ws.delete_cols(ws[em_col][0].column, 1)
         wb.save(output_path)
 
-    # Re-read the written file once. If preserve_na is True, instruct pandas
-    # not to interpret default NA strings (so "NA" remains a literal string).
-    export_df = pd.read_excel(output_path, keep_default_na=(not preserve_na))
+    export_df = pd.read_excel(output_path)
+    export_df = _blank_literal_na(export_df)
 
     numeric_cols = export_df.select_dtypes(include=['int64', 'float64']).columns
     for col in numeric_cols:
@@ -355,5 +332,17 @@ def export_excel_with_spacing(
     export_df.to_excel(output_path, index=False)
 
     apply_row_formatting(output_path, mp_codes_with_em, mp_codes)
-    apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes, preserve_na=preserve_na)
+    apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes)
     print(f"\t- Exported {len(export_df)} entries to {output_path}")
+
+
+def _blank_literal_na(df: pd.DataFrame) -> pd.DataFrame:
+    cleaned_df = df.copy()
+    object_columns = cleaned_df.select_dtypes(include=['object', 'string']).columns
+    if len(object_columns) > 0:
+        cleaned_df[object_columns] = cleaned_df[object_columns].replace(
+            to_replace=r'^\s*NA\s*$',
+            value='',
+            regex=True,
+        )
+    return cleaned_df

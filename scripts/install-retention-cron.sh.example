@@ -1,0 +1,35 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env.local}"
+CRON_SCHEDULE="${CRON_SCHEDULE:-30 3 * * *}"
+CONTAINER_NAME="${CONTAINER_NAME:-esfera-acta-extractor-web}"
+HELPER_PATH="${HELPER_PATH:-/usr/local/bin/esfera2excel-retention-cleanup}"
+CRON_LOG="${CRON_LOG:-/var/log/esfera2excel-retention.log}"
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Missing $ENV_FILE"
+  exit 1
+fi
+
+set -a
+. "$ENV_FILE"
+set +a
+
+: "${FAILURE_RETENTION_DAYS:=30}"
+: "${FAILURE_MAX_SIZE_MB:=1024}"
+
+install -m 755 "$REPO_ROOT/scripts/run-retention-cleanup.sh.example" "$HELPER_PATH"
+
+CRON_LINE="$CRON_SCHEDULE CONTAINER_NAME=$CONTAINER_NAME FAILURE_RETENTION_DAYS=$FAILURE_RETENTION_DAYS FAILURE_MAX_SIZE_MB=$FAILURE_MAX_SIZE_MB $HELPER_PATH >> $CRON_LOG 2>&1"
+TMP_CRON="$(mktemp)"
+
+crontab -l 2>/dev/null | grep -v "$HELPER_PATH" > "$TMP_CRON" || true
+printf '%s\n' "$CRON_LINE" >> "$TMP_CRON"
+crontab "$TMP_CRON"
+rm -f "$TMP_CRON"
+
+echo "Installed cron entry:"
+echo "$CRON_LINE"

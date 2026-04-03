@@ -1,0 +1,95 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="$REPO_ROOT/.env.local"
+CONTAINER_NAME="esfera-acta-extractor-web-debug"
+IMAGE_NAME="esfera-acta-extractor-web"
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Missing $ENV_FILE"
+  echo "Create it from .env.local.example and fill in the Telegram values."
+  exit 1
+fi
+
+prompt_and_store_if_placeholder() {
+  var_name="$1"
+  placeholder_value="$2"
+  prompt_text="$3"
+  current_value="$(printenv "$var_name" 2>/dev/null || true)"
+
+  if [ -n "$current_value" ] && [ "$current_value" != "$placeholder_value" ]; then
+    return 0
+  fi
+
+  if [ ! -t 0 ]; then
+    echo "Missing real value for $var_name in $ENV_FILE"
+    exit 1
+  fi
+
+  printf "%s: " "$prompt_text"
+  IFS= read -r entered_value
+  if [ -z "$entered_value" ]; then
+    echo "A value is required for $var_name."
+    exit 1
+  fi
+
+  python3 - "$ENV_FILE" "$var_name" "$entered_value" <<'PY'
+from pathlib import Path
+import sys
+
+env_path = Path(sys.argv[1])
+key = sys.argv[2]
+value = sys.argv[3]
+lines = env_path.read_text(encoding="utf-8").splitlines()
+updated = False
+for index, line in enumerate(lines):
+    if line.startswith(f"{key}="):
+        lines[index] = f"{key}={value}"
+        updated = True
+        break
+if not updated:
+    lines.append(f"{key}={value}")
+env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+
+  export "$var_name=$entered_value"
+  echo "Saved $var_name to $ENV_FILE"
+}
+
+set -a
+. "$ENV_FILE"
+set +a
+
+prompt_and_store_if_placeholder "TELEGRAM_BOT_TOKEN" "replace-with-your-bot-token" "Enter TELEGRAM_BOT_TOKEN"
+prompt_and_store_if_placeholder "TELEGRAM_CHAT_ID" "replace-with-your-chat-id" "Enter TELEGRAM_CHAT_ID"
+
+: "${SECRET_KEY:?Missing SECRET_KEY in .env.local}"
+: "${ADMIN_USERNAME:?Missing ADMIN_USERNAME in .env.local}"
+: "${ADMIN_PASSWORD:?Missing ADMIN_PASSWORD in .env.local}"
+: "${TELEGRAM_BOT_TOKEN:?Missing TELEGRAM_BOT_TOKEN in .env.local}"
+: "${TELEGRAM_CHAT_ID:?Missing TELEGRAM_CHAT_ID in .env.local}"
+: "${FAILURE_RETENTION_DAYS:=30}"
+: "${FAILURE_MAX_SIZE_MB:=1024}"
+
+docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+docker build -t "$IMAGE_NAME" "$REPO_ROOT"
+docker run -d \
+  --name "$CONTAINER_NAME" \
+  -p 8000:8000 \
+  -e SECRET_KEY="$SECRET_KEY" \
+  -e ADMIN_USERNAME="$ADMIN_USERNAME" \
+  -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+  -e TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN" \
+  -e TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID" \
+  -e FAILURE_RETENTION_DAYS="$FAILURE_RETENTION_DAYS" \
+  -e FAILURE_MAX_SIZE_MB="$FAILURE_MAX_SIZE_MB" \
+  -e AUDIT_DB_PATH=/app/data/conversion_audit.sqlite3 \
+  -e FAILURE_ROOT=/app/failed_uploads \
+  -v "$REPO_ROOT/data:/app/data" \
+  -v "$REPO_ROOT/failed_uploads:/app/failed_uploads" \
+  "$IMAGE_NAME"
+
+echo "App available at http://127.0.0.1:8000/"
+echo "Admin available at http://127.0.0.1:8000/admin/login"

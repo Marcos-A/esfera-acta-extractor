@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+CONTAINER_NAME="${CONTAINER_NAME:-esfera-acta-extractor-web}"
+RETENTION_DAYS="${FAILURE_RETENTION_DAYS:-30}"
+MAX_SIZE_MB="${FAILURE_MAX_SIZE_MB:-1024}"
+
+docker exec "$CONTAINER_NAME" python scripts/cleanup_failed_uploads.py \
+  --retention-days "$RETENTION_DAYS" \
+  --max-size-mb "$MAX_SIZE_MB"
