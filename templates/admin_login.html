@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Login</title>
+    <style>
+      :root {
+        --ink: #1d2023;
+        --bg: #f2efe7;
+        --panel: #fffdf8;
+        --accent: #0d5c63;
+        --border: #d9c9af;
+        --error: #9f2d2d;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: linear-gradient(145deg, #f5e7cf, #eef2eb);
+        color: var(--ink);
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      main {
+        width: min(420px, 100%);
+        padding: 28px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(20, 31, 36, 0.12);
+      }
+      h1 { margin-top: 0; margin-bottom: 10px; font-size: 2rem; }
+      p { margin-top: 0; color: #5d646b; }
+      form { display: grid; gap: 14px; }
+      label { font-weight: 700; font-size: 0.95rem; }
+      input {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        font: inherit;
+      }
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 13px 18px;
+        background: var(--accent);
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .error {
+        margin-bottom: 14px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #fde9e9;
+        color: var(--error);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Admin</h1>
+      <p>Sign in to inspect processed files, failures, and audit records.</p>
+      {% if error %}
+      <div class="error">{{ error }}</div>
+      {% endif %}
+      <form method="post">
+        <div>
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" required>
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit">Open admin dashboard</button>
+      </form>
+    </main>
+  </body>
+</html>

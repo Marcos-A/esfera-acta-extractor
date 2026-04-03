@@ -65,3 +65,10 @@ cursor.local.json
 cursor.local.jsonc
 windsurf.local.json
 windsurf.local.jsonc
+
+# Local runtime secrets and helper scripts
+.env.local
+run-local-web.sh
+
+# Runtime application state
+data/

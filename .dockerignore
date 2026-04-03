@@ -1,0 +1,10 @@
+.git
+.venv
+__pycache__
+*.pyc
+.DS_Store
+01_source_pdfs
+02_extracted_data
+03_final_grade_summaries
+failed_uploads
+data

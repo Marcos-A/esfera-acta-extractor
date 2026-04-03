@@ -46,6 +46,14 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
         print(f"[ERROR summary_generator] Could not load data from {source_xlsx_path}. Skipping.")
         return
 
+    object_columns = df_source.select_dtypes(include=['object', 'string']).columns
+    if len(object_columns) > 0:
+        df_source[object_columns] = df_source[object_columns].replace(
+            to_replace=r'^\s*NA\s*$',
+            value='',
+            regex=True
+        )
+
     # Detect actual student data rows by finding the first completely empty row
     empty_row_index = df_source[df_source.isnull().all(axis=1)].index
     if not empty_row_index.empty:
@@ -288,7 +296,7 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
             col_letter = get_column_letter(col_idx)
             range_str = f"{col_letter}2:{col_letter}{ws.max_row}"
             
-            # Add conditional formatting rule for cells containing specific strings (PDT, EP, NA, PQ)
+            # Add conditional formatting rule for cells containing specific strings (PDT, EP, PQ)
             # This rule should be applied *before* the general non-numeric/empty rule
             # because conditional formatting rules are applied in the order they are added.
             # The stopIfTrue=True ensures that if this rule applies, the next rule is not checked.
@@ -298,7 +306,6 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
                     formula=[
                         f'OR(UPPER({col_letter}2)="PDT", '
                         f'UPPER({col_letter}2)="EP", '
-                        f'UPPER({col_letter}2)="NA", '
                         f'UPPER({col_letter}2)="PQ")'
                     ],
                     stopIfTrue=True,

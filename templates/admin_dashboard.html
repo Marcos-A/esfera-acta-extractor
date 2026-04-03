@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Dashboard</title>
+    <style>
+      :root {
+        --ink: #182226;
+        --muted: #5d6c70;
+        --bg: #f5f1e8;
+        --panel: #fffdf9;
+        --border: #d7c9b6;
+        --accent: #0f766e;
+        --danger: #ab3131;
+        --success: #2d6a4f;
+        --warning: #9a6700;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(15, 118, 110, 0.12), transparent 22%),
+          linear-gradient(180deg, #f0e6d7, var(--bg));
+        color: var(--ink);
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      .wrap {
+        width: min(1300px, calc(100% - 32px));
+        margin: 24px auto 40px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1;
+      }
+      .sub {
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      .logout button {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 10px 14px;
+        background: var(--panel);
+        font: inherit;
+        cursor: pointer;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+      .card, .panel {
+        background: rgba(255, 253, 249, 0.92);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 18px 50px rgba(26, 34, 38, 0.07);
+      }
+      .card {
+        padding: 18px;
+      }
+      .label {
+        color: var(--muted);
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .value {
+        margin-top: 8px;
+        font-size: 2rem;
+        font-weight: 700;
+      }
+      .panels {
+        display: grid;
+        gap: 18px;
+      }
+      .panel {
+        padding: 18px;
+        overflow: auto;
+      }
+      h2 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 1.35rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 900px;
+      }
+      th, td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #e6ddd0;
+        text-align: left;
+        vertical-align: top;
+        font-size: 0.95rem;
+      }
+      th {
+        color: var(--muted);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .status {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+      .status.success { background: #e5f5eb; color: var(--success); }
+      .status.error { background: #fde9e9; color: var(--danger); }
+      .status.processing, .status.received { background: #fff3d6; color: var(--warning); }
+      code { font-size: 0.9em; }
+      .note {
+        margin-bottom: 10px;
+        color: var(--muted);
+      }
+      .actions a {
+        display: inline-block;
+        margin-right: 10px;
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .actions form {
+        display: inline-block;
+        margin: 0;
+      }
+      .actions button {
+        appearance: none;
+        border: 0;
+        padding: 0;
+        margin-right: 10px;
+        background: transparent;
+        color: var(--danger);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .actions button:last-child {
+        margin-right: 0;
+      }
+      .actions a:last-child {
+        margin-right: 0;
+      }
+      .flash {
+        margin-bottom: 18px;
+        padding: 12px 14px;
+        border: 1px solid #e5d2b3;
+        border-radius: 14px;
+        background: #fff4df;
+        color: #7a4a00;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for message in messages %}
+          <div class="flash">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      <header>
+        <div>
+          <h1>esfera2excel admin</h1>
+          <div class="sub">Signed in as {{ admin_username }}. Failed uploads are retained under <code>{{ failure_root }}</code>.</div>
+        </div>
+        <form class="logout" method="post" action="{{ url_for('admin_logout') }}">
+          <button type="submit">Log out</button>
+        </form>
+      </header>
+
+      <section class="cards">
+        <div class="card">
+          <div class="label">Jobs</div>
+          <div class="value">{{ summary.total_jobs or 0 }}</div>
+        </div>
+        <div class="card">
+          <div class="label">Job Success</div>
+          <div class="value">{{ summary.success_jobs or 0 }}</div>
+        </div>
+        <div class="card">
+          <div class="label">Job Errors</div>
+          <div class="value">{{ summary.error_jobs or 0 }}</div>
+        </div>
+        <div class="card">
+          <div class="label">Files</div>
+          <div class="value">{{ summary.total_files or 0 }}</div>
+        </div>
+        <div class="card">
+          <div class="label">File Success</div>
+          <div class="value">{{ summary.success_files or 0 }}</div>
+        </div>
+        <div class="card">
+          <div class="label">File Errors</div>
+          <div class="value">{{ summary.error_files or 0 }}</div>
+        </div>
+      </section>
+
+      <section class="panels">
+        <div class="panel">
+          <h2>Recent Jobs</h2>
+          <div class="note">Most recent conversion requests across PDF and ZIP uploads.</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>Source</th>
+                <th>Files</th>
+                <th>Returned</th>
+                <th>Created</th>
+                <th>Returned At</th>
+                <th>Error</th>
+                <th>Artifacts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for job in recent_jobs %}
+              <tr>
+                <td><code>{{ job.job_id }}</code></td>
+                <td><span class="status {{ job.status }}">{{ job.status }}</span></td>
+                <td>{{ job.request_type }}</td>
+                <td>{{ job.source_name }}</td>
+                <td>{{ job.source_file_count }}</td>
+                <td>{{ job.returned_name or '' }}</td>
+                <td>{{ job.created_at }}</td>
+                <td>{{ job.returned_at or '' }}</td>
+                <td>{{ job.error_message or '' }}</td>
+                <td class="actions">
+                  {% if job.status == 'error' %}
+                    {% if job.has_failed_source %}
+                  <a href="{{ url_for('admin_download_failed_source', job_id=job.job_id) }}">Source</a>
+                    {% endif %}
+                    {% if job.has_failure_log %}
+                  <a href="{{ url_for('admin_download_failure_log', job_id=job.job_id) }}">Log</a>
+                    {% endif %}
+                    {% if job.has_failed_source or job.has_failure_log %}
+                  <form method="post" action="{{ url_for('admin_delete_job_artifacts', job_id=job.job_id) }}">
+                    <button type="submit">Delete</button>
+                  </form>
+                    {% elif job.artifacts_deleted_at %}
+                  <span>Deleted at {{ job.artifacts_deleted_at }}</span>
+                    {% endif %}
+                  {% else %}
+                  <code>{{ job.debug_path or '' }}</code>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h2>Recent Files</h2>
+          <div class="note">Per-file conversion records, useful when ZIP uploads contain several PDFs.</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Status</th>
+                <th>Source File</th>
+                <th>Output File</th>
+                <th>Created</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in recent_files %}
+              <tr>
+                <td><code>{{ item.job_id }}</code></td>
+                <td><span class="status {{ item.status }}">{{ item.status }}</span></td>
+                <td>{{ item.source_name }}</td>
+                <td>{{ item.output_name or '' }}</td>
+                <td>{{ item.created_at }}</td>
+                <td>{{ item.error_message or '' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

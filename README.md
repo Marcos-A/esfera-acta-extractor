@@ -2,229 +2,466 @@
 
 # Esfer@ Acta Extractor
 
-Una eina en Python per extreure i processar els registres de qualificacions de les actes de notes en PDF d'Esfer@. L'eina extreu les taules dels PDF, processa les notes dels estudiants i genera dos tipus de fitxers Excel:
-1. Un fitxer detallat amb totes les qualificacions de RA (Resultats d'Aprenentatge), EM (Estada a l'Empresa) i MP (Mòdul Professional).
-2. Un resum de qualificacions per a cada MP amb les notes dels estudiants i una vista clara dels resultats, incloent tant l'avaluació del centre com de l'empresa quan correspongui.
+Aplicació per convertir actes d'Esfer@ en PDF a fitxers Excel. El projecte inclou:
 
-## Característiques
+- una aplicació web per pujar un PDF o un ZIP amb diversos PDFs
+- una àrea d'administració a `/admin` per consultar conversions, errors i artefactes conservats
+- una via CLI antiga per processar lots locals des del repositori
 
-### Processament de PDF
-- Extracció automàtica de taules dels informes de qualificacions en PDF
-- Processament intel·ligent dels noms i notes dels estudiants
-- Suport per a qualificacions de RA (Resultats d'Aprenentatge), EM (Estada a l'Empresa) i MP (Mòdul Professional)
-- Identificació automàtica dels MP amb hores d'estada a l'empresa (EM) i les seves qualificacions corresponents
+La forma recomanada d'ús i desplegament és la versió web amb Docker.
 
-### Fitxer Excel Detallat
-- Vista completa de totes les qualificacions de RA, EM i MP
-- Organització clara per estudiant i MP
-- Format condicional per a una millor visualització
+## Què fa
 
-### Resum de Qualificacions
-- Vista consolidada de les notes per a cada MP
-- Diferents formats numèrics per a tipus A (2 decimals) i tipus B (nombres enters)
-- Llegenda integrada que explica els tipus de MP
-- Colors alternats per a millor llegibilitat
-- Validació de dades per assegurar valors correctes
-- Formatació professional i preparada per a la impressió
+La web accepta:
+
+- un únic fitxer `.pdf`, i retorna un únic `.xlsx`
+- un fitxer `.zip` amb diversos PDFs, i retorna un `.zip` amb un `.xlsx` per cada PDF convertit
+
+La conversió reutilitza la lògica històrica del projecte per:
+
+- extreure taules del PDF d'Esfer@
+- identificar alumnes, codis MP, RA i EM
+- generar un Excel amb l'estructura del directori `02_extracted_data`
+
+Els valors literals `NA` es tracten com a cel·les buides.
+
+## Característiques principals
+
+### Aplicació web
+
+- Interfície pública en català
+- Pujada de PDF o ZIP
+- Seguiment asíncron del progrés de conversió
+- Missatges d'estat intermedis, com ara descompressió, conversió i compressió final
+- Missatges d'error públics pensats per a usuaris finals
+- Descàrrega automàtica del fitxer convertit quan el procés acaba
+
+### Administració
+
+- Accés protegit amb usuari i contrasenya a `/admin`
+- Tauler amb històric recent de treballs i fitxers convertits
+- Descàrrega del fitxer font fallit i del `failure.log`
+- Eliminació manual dels artefactes conservats d'un error
+- Registre persistent en SQLite
+
+### Operació i manteniment
+
+- Eliminació automàtica dels fitxers pujats quan la conversió té èxit
+- Conservació dels errors només per a depuració
+- Notificacions d'error via Telegram, SMTP o webhook
+- Script de neteja automàtica per antiguitat i/o mida total
+- Desplegament pensat per a contenidor Docker darrere d'un proxy invers
+
+## Arquitectura funcional
+
+1. L'usuari puja un PDF o un ZIP.
+2. La web desa temporalment el fitxer en un directori de treball.
+3. Un fil en segon pla processa la conversió.
+4. La UI consulta l'estat via API i mostra una barra de progrés.
+5. En èxit:
+   - es prepara la descàrrega
+   - el fitxer temporal es neteja després de servir-lo
+6. En error:
+   - es conserva una còpia del fitxer font i qualsevol sortida parcial a `FAILURE_ROOT/<job_id>`
+   - es genera un `failure.log`
+   - es registra el cas a SQLite
+   - s'envia una notificació al propietari si està configurada
+
+## Sortides generades
+
+La sortida principal és un fitxer Excel amb el mateix tipus d'estructura que el projecte ja generava al directori `02_extracted_data`.
+
+Addicionalment, el codi històric encara pot generar resums de qualificacions al directori `03_final_grade_summaries` quan s'executa per CLI.
 
 ## Requisits
 
-- Docker (recomanat)  
-- Python 3.9+ (si s’executa localment)  
-- Paquets de Python necessaris enumerats a `requirements.txt`  
+- Docker
+- Python 3.9+ només si vols executar scripts locals fora del contenidor
 
 ## Estructura del projecte
 
-```
+```text
 .
-├── 01_source_pdfs/           # Directori per als fitxers PDF d'entrada
-│   └── .gitkeep              # Manté el directori a Git però ignora els continguts
-├── 02_extracted_data/        # Directori per als fitxers Excel de sortida
-│   └── .gitkeep              # Manté el directori a Git però ignora els continguts
-├── 03_final_grade_summaries/ # Directori per als fitxers Excel de resum final
-│   └── .gitkeep              # Manté el directori a Git però ignora els continguts
-├── rules/                    # Regles de configuració del projecte
-│   └── column-context.md     # Regles de context de columnes
-├── src/                      # Paquet de codi font
-│   ├── __init__.py           # Inicialització del paquet i exports
-│   ├── pdf_processor.py      # Extracció i processament de PDFs
-│   ├── data_processor.py     # Utilitats de processament de dades generals
-│   ├── grade_processor.py    # Lògica específica de qualificacions
-│   ├── excel_processor.py    # Generació i formatació d'Excel
-│   └── summary_generator.py  # Generació d'informes de qualificacions
-├── cursor.config.jsonc       # Configuració de Cursor
-├── windsurf.config.jsonc     # Configuració de Windsurf
-├── Dockerfile                # Configuració del contenidor Docker
-├── README.md                 # Aquest fitxer (català)
-├── README.en.md              # Versió anglès
-├── requirements.txt          # Dependències de Python
-├── LICENSE                   # Llicència GNU GPL-3.0
-└── esfera-acta-extractor.py  # Script principal
-
+├── app.py                                # Aplicació web Flask
+├── Dockerfile                            # Imatge Docker de la web
+├── requirements.txt                      # Dependències Python
+├── templates/                            # Plantilles HTML de la web i /admin
+│   ├── index.html                        # Interfície pública de conversió
+│   ├── admin_login.html                  # Pantalla de login d'administració
+│   └── admin_dashboard.html              # Tauler d'administració
+├── src/
+│   ├── audit.py                          # Registre SQLite de treballs i fitxers
+│   ├── conversion_service.py             # Flux reutilitzable de conversió
+│   ├── notifier.py                       # Notificacions d'error
+│   ├── pdf_processor.py                  # Extracció de taules i metadades del PDF
+│   ├── data_processor.py                 # Neteja i transformació de dades
+│   ├── grade_processor.py                # Lògica de qualificacions
+│   ├── excel_processor.py                # Generació del fitxer Excel principal
+│   └── summary_generator.py              # Generació de resums per CLI
+├── scripts/
+│   ├── cleanup_failed_uploads.py         # Neteja automàtica de fallades conservades
+│   ├── run-local-web.sh.example          # Plantilla d'arrencada local
+│   ├── run-retention-cleanup.sh.example  # Helper de neteja per a servidor
+│   └── install-retention-cron.sh.example # Instal·lador de cron per a neteja
+├── .env.local.example                    # Variables d'entorn locals de mostra
+├── data/                                 # Base SQLite i dades persistides en local o al servidor
+├── failed_uploads/                       # Errors conservats temporalment per a depuració
+├── 01_source_pdfs/                       # Entrada per a la via CLI antiga
+├── 02_extracted_data/                    # Sortida Excel de la via CLI antiga
+├── 03_final_grade_summaries/             # Resums de la via CLI antiga
+├── original_pdf_files/                   # Carpeta opcional per a proves manuals, ignorada per Git
+└── esfera-acta-extractor.py              # Punt d'entrada de la via CLI antiga
 ```
 
-### Descripció dels mòduls
+## Inici ràpid local amb Docker
 
-- **pdf_processor.py**: Gestiona totes les operacions relacionades amb PDF  
-  - Extracció de taules dels PDF  
-  - Extracció del codi de grup de la primera pàgina  
+### Opció recomanada
 
-- **data_processor.py**: Utilitats generals de processament de dades  
-  - Normalització d'encapçalaments  
-  - Filtrat i transformació de columnes  
-  - Neteja i reformat de dades  
+1. Crea el fitxer local privat:
 
-- **grade_processor.py**: Lògica específica de qualificacions  
-  - Extracció de registres de RA  
-  - Identificació de codi MP  
-  - Detecció d'entrades EM  
-  - Ordenació de registres  
+```bash
+cp .env.local.example .env.local
+```
 
-- **excel_processor.py**: Gestió de fitxers Excel  
-  - Generació de fitxers Excel  
-  - Espaiat i organització de columnes  
-  - Format i fórmules
+2. Crea el script local privat:
 
-- **summary_generator.py**: Generació d'informes de qualificacions  
-  - Crea resums de qualificacions per a cada MP  
-  - Inclou codis de RA i notes dels estudiants  
-  - Aplica format condicional per a una millor llegibilitat  
-  - Genera llegenda explicativa dels tipus de MP  
+```bash
+cp scripts/run-local-web.sh.example run-local-web.sh
+chmod +x run-local-web.sh
+```
 
-## Instal·lació i ús
+3. Executa'l:
 
-### Ús amb Docker (recomanat)
+```bash
+./run-local-web.sh
+```
 
-**Important**: Col·loca el teu fitxer PDF d'Esfer@ a la carpeta arrel del projecte abans d'executar qualsevol comanda de Docker.
+4. Obre:
 
-1. Construeix la imatge de Docker:
+- `http://127.0.0.1:8000/`
+- `http://127.0.0.1:8000/admin/login`
+
+Comportament del primer llançament:
+
+- si `TELEGRAM_BOT_TOKEN` o `TELEGRAM_CHAT_ID` encara tenen el valor de plantilla, l'script te'ls demanarà i els desarà a `.env.local`
+
+Els fitxers `run-local-web.sh` i `.env.local` estan ignorats per Git.
+
+### Execució Docker manual
+
+També pots arrencar la web sense el helper:
+
+```bash
+docker build -t esfera-acta-extractor-web .
+
+docker run --rm -p 8000:8000 \
+  -e SECRET_KEY=canvia-aquesta-clau \
+  -e ADMIN_USERNAME=marcos \
+  -e ADMIN_PASSWORD=canvia-aquesta-contrasenya \
+  -e TELEGRAM_BOT_TOKEN=123456:ABCDEF \
+  -e TELEGRAM_CHAT_ID=123456789 \
+  -e AUDIT_DB_PATH=/app/data/conversion_audit.sqlite3 \
+  -e FAILURE_ROOT=/app/failed_uploads \
+  -v "$(pwd)/data:/app/data" \
+  -v "$(pwd)/failed_uploads:/app/failed_uploads" \
+  esfera-acta-extractor-web
+```
+
+## Configuració
+
+Variables principals:
+
+| Variable | Descripció | Valor per defecte |
+|---|---|---|
+| `SECRET_KEY` | Clau de sessió de Flask per a `/admin` | `change-me-before-production` |
+| `ADMIN_USERNAME` | Usuari de l'àrea `/admin` | `admin` |
+| `ADMIN_PASSWORD` | Contrasenya de l'àrea `/admin` | `change-me` |
+| `MAX_UPLOAD_SIZE_MB` | Mida màxima de pujada | `50` |
+| `AUDIT_DB_PATH` | Ruta de la base SQLite | `./data/conversion_audit.sqlite3` |
+| `FAILURE_ROOT` | Directori on es conserven errors | `./failed_uploads` |
+| `UPLOAD_ROOT` | Directori temporal de treball | `/tmp/esfera-acta-extractor` |
+
+Notificacions:
+
+| Variable | Ús |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram |
+| `TELEGRAM_CHAT_ID` | Chat ID receptor |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` | Configuració SMTP |
+| `SMTP_USE_TLS`, `SMTP_USE_SSL` | Transport SMTP |
+| `ALERT_FROM_EMAIL`, `ALERT_TO_EMAIL` | Remitent i destinatari de correu |
+| `ALERT_WEBHOOK_URL` | Webhook genèric alternatiu |
+
+Política de retenció:
+
+| Variable | Ús | Valor recomanat |
+|---|---|---|
+| `FAILURE_RETENTION_DAYS` | Dies màxims de conservació | `30` |
+| `FAILURE_MAX_SIZE_MB` | Límit de mida total de `failed_uploads` | `1024` |
+
+## Com funciona la web
+
+### Per a un PDF
+
+- es rep el fitxer
+- es converteix a un únic Excel
+- l'usuari descarrega el `.xlsx`
+- el fitxer pujat i el directori temporal s'eliminen després
+
+### Per a un ZIP
+
+- es descomprimeixen només els PDFs vàlids
+- es converteix cada PDF a Excel
+- es genera un ZIP final amb tots els `.xlsx`
+- el ZIP original i el directori temporal s'eliminen després
+
+### En cas d'error
+
+- la interfície pública mostra un missatge genèric i amigable
+- l'error tècnic queda registrat a l'àrea `/admin`
+- es conserva un directori de depuració amb:
+  - el fitxer font fallit
+  - qualsevol sortida parcial
+  - `failure.log`
+
+## Àrea d'administració
+
+La ruta és `/admin`.
+
+Inclou:
+
+- resum de treballs i fitxers
+- estat de les conversions
+- hora de creació i retorn
+- errors registrats
+- descàrrega del fitxer font conservat
+- descàrrega del `failure.log`
+- eliminació manual dels artefactes d'un error
+
+Observacions:
+
+- la interfície d'administració està en anglès
+- els timestamps registrats es desen en UTC
+
+## Notificacions d'error
+
+L'opció recomanada és Telegram.
+
+Flux mínim:
+
+1. crea un bot amb `@BotFather`
+2. obtén el token
+3. envia un missatge al bot
+4. obtén el `chat_id`
+5. defineix `TELEGRAM_BOT_TOKEN` i `TELEGRAM_CHAT_ID`
+
+Quan falla una conversió, l'aplicació pot enviar:
+
+- `job_id`
+- nom del fitxer
+- tipus de petició
+- error principal
+- ruta del directori de depuració
+
+## Conservació i neteja de fallades
+
+### Esborrat manual
+
+Des de `/admin` pots esborrar els artefactes conservats d'un error una vegada revisat.
+
+### Script de neteja
+
+Pots executar:
+
+```bash
+python3 scripts/cleanup_failed_uploads.py --retention-days 30 --max-size-mb 1024
+```
+
+Mode de prova:
+
+```bash
+python3 scripts/cleanup_failed_uploads.py --dry-run
+```
+
+### Execució dins del contenidor en producció
+
+```bash
+docker exec esfera-acta-extractor-web python scripts/cleanup_failed_uploads.py --retention-days 30 --max-size-mb 1024
+```
+
+### Helper i cron
+
+Helper per a servidor:
+
+```bash
+cp scripts/run-retention-cleanup.sh.example /usr/local/bin/esfera2excel-retention-cleanup
+chmod +x /usr/local/bin/esfera2excel-retention-cleanup
+```
+
+Instal·lador de `cron` a partir del mateix `.env.local`:
+
+```bash
+cp scripts/install-retention-cron.sh.example /usr/local/bin/esfera2excel-install-retention-cron
+chmod +x /usr/local/bin/esfera2excel-install-retention-cron
+ENV_FILE=/ruta/al/.env.local CONTAINER_NAME=esfera-acta-extractor-web /usr/local/bin/esfera2excel-install-retention-cron
+```
+
+Exemple de cron diari:
+
+```cron
+30 3 * * * CONTAINER_NAME=esfera-acta-extractor-web FAILURE_RETENTION_DAYS=30 FAILURE_MAX_SIZE_MB=1024 /usr/local/bin/esfera2excel-retention-cleanup >> /var/log/esfera2excel-retention.log 2>&1
+```
+
+Recomanació operativa:
+
+- usa `FAILURE_RETENTION_DAYS` com a regla principal
+- usa `FAILURE_MAX_SIZE_MB` com a límit de seguretat
+- conserva l'esborrat manual per als casos que ja hagis investigat
+
+## Desplegament recomanat
+
+### Objectiu
+
+Desplegar la web a `https://esfera2excel.marcos-a.com` darrere d'un proxy invers, amb el contenidor escoltant a `127.0.0.1:8000`.
+
+### Persistència
+
+Munta com a volums persistents:
+
+- `/app/data`
+- `/app/failed_uploads`
+
+Configura també:
+
+- `AUDIT_DB_PATH=/app/data/conversion_audit.sqlite3`
+- `FAILURE_ROOT=/app/failed_uploads`
+
+### Proxy invers
+
+Exemple mínim amb Nginx:
+
+```nginx
+server {
+    server_name esfera2excel.marcos-a.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+El proxy ha de:
+
+- servir `https://esfera2excel.marcos-a.com/`
+- servir també `https://esfera2excel.marcos-a.com/admin`
+- acabar TLS
+- propagar `X-Forwarded-For`
+
+### Comanda tipus de producció
+
+```bash
+docker run -d \
+  --name esfera-acta-extractor-web \
+  -p 127.0.0.1:8000:8000 \
+  -e SECRET_KEY=canvia-aquesta-clau \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=canvia-aquesta-contrasenya \
+  -e TELEGRAM_BOT_TOKEN=... \
+  -e TELEGRAM_CHAT_ID=... \
+  -e FAILURE_RETENTION_DAYS=30 \
+  -e FAILURE_MAX_SIZE_MB=1024 \
+  -e AUDIT_DB_PATH=/app/data/conversion_audit.sqlite3 \
+  -e FAILURE_ROOT=/app/failed_uploads \
+  -v /ruta/persistent/data:/app/data \
+  -v /ruta/persistent/failed_uploads:/app/failed_uploads \
+  esfera-acta-extractor-web
+```
+
+Bones pràctiques:
+
+- no incrustis secrets a la imatge
+- no exposis el port directament a internet si hi ha proxy invers
+- canvia sempre `SECRET_KEY` i `ADMIN_PASSWORD`
+
+## Rutes HTTP útils
+
+| Ruta | Ús |
+|---|---|
+| `/` | Interfície pública |
+| `/health` | Comprovació bàsica de salut |
+| `/convert` | Inici de la conversió |
+| `/convert/status/<job_id>` | Estat i progrés |
+| `/convert/download/<job_id>` | Descàrrega del resultat |
+| `/admin/login` | Accés d'administració |
+| `/admin` | Tauler d'administració |
+
+## Resolució de problemes
+
+### El contenidor arrenca però no es pot iniciar sessió a `/admin`
+
+Comprova:
+
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `SECRET_KEY`
+
+### Les alertes de Telegram no arriben
+
+Comprova:
+
+- que el bot existeix
+- que li has enviat un missatge
+- que `TELEGRAM_BOT_TOKEN` és correcte
+- que `TELEGRAM_CHAT_ID` és correcte
+
+### Els errors no desapareixen mai del servidor
+
+Comprova:
+
+- si has programat la neteja automàtica
+- si `FAILURE_RETENTION_DAYS` i `FAILURE_MAX_SIZE_MB` estan definits
+- si el `cron` s'està executant realment
+
+## Via CLI antiga
+
+El projecte manté la via CLI original per processar carpetes locals.
+
+Entrades i sortides:
+
+- entrada: `01_source_pdfs`
+- sortida principal: `02_extracted_data`
+- resums: `03_final_grade_summaries`
+
+Execució amb Docker:
+
 ```bash
 docker build -t esfera-acta-extractor .
+docker run --rm -v "$(pwd):/app" esfera-acta-extractor python esfera-acta-extractor.py
 ```
 
-Tens dues opcions per executar el contenidor:
-
-   a. Execució directa:
-   ```bash
-   docker run -v $(pwd):/app esfera-acta-extractor python esfera-acta-extractor.py
-   ```
-
-   b. Mode interactiu (recomanat per depuració o múltiples fitxers):
-   ```bash
-   docker run --rm -it \
-     -v "$(pwd)":/data \
-     -w /data \
-     esfera-acta-extractor
-   ```
-   Una vegada dins el contenidor, pots executar:
-   ```bash
-   python esfera-acta-extractor.py
-   ```
-   Opcional: per controlar com es tracta la cadena "NA" a les cel·les d'Excel:
-
-   - Per defecte l'eina **preserva** literalment la cadena `NA` (apareixerà com a `NA` i rebreà la coloració corresponent).
-   - Si voleu el comportament antic (tractar `NA` com a valor faltant i convertir-lo a cel·la buida), establiu la variable d'entorn `PRESERVE_NA=0` abans d'executar.
-
-   Exemple (manté `NA`):
-   ```bash
-   python esfera-acta-extractor.py
-   ```
-
-   Exemple (tracta `NA` com a buit, comportament antic):
-   ```bash
-   PRESERVE_NA=0 python esfera-acta-extractor.py
-   ```
-   Per sortir de la shell interactiva, simplement escriu:
-   ```bash
-   exit
-   ```
-
-**Nota**: El script:
-- Buscarà els fitxers PDF en el directori `01_source_pdfs`
-- Processarà cada fitxer PDF individualment
-- Generarà els fitxers Excel de sortida en el directori `02_extracted_data`
-- Anomenarà cada fitxer de sortida basant-se en el codi de grup trobat en el seu PDF corresponent
-- Saltarà els fitxers que no són PDFs o no es poden processar
-- Continuarà processant els fitxers restants fins i tot si algun falla
-
-3. Neteja del contenidor:
-   - Per al mode interactiu (opció --rm): el contenidor s'elimina automàticament en sortir
-   - Per a processos en segon pla: atura el contenidor amb:
-   ```bash
-   docker stop $(docker ps -q --filter ancestor=esfera-acta-extractor)
-   ```
-
-**Nota**: L'eina:
-- Buscarà el fitxer PDF al directori actual
-- Generarà el fitxer Excel de sortida al mateix directori
-- Anomenarà el fitxer de sortida segons el codi de grup trobat al PDF
-
-#### Instal·lació local
-
-1. Clona el repositori:
-```bash
-git clone https://github.com/Marcos-A/esfera-acta-extractor.git
-cd esfera-acta-extractor
-```
-
-2. Instal·la les dependències:
-```bash
-pip install -r requirements.txt
-```
-
-3. Executa l'_script_:
-```bash
-python esfera-acta-extractor.py
-```
-
-## Entrada/Sortida
-
-### Entrada
-- Fitxer PDF d'Esfer@ amb taules de qualificacions
-- El fitxer ha d'incloure el camp "Codi del grup" a la primera pàgina
-- Formats de qualificació esperats: A#, PDT, EP, NA
-
-### Sortida
-- Fitxer Excel anomenat amb el codi de grup (p. ex., `CFPM_AG10101.xlsx`)
-- Conté:
-  - Noms dels estudiants
-  - Notes de RA agrupades per MP
-  - 3 columnes buides després dels MP amb entrades EM (etiquetades com a CENTRE, EMPRESA, MP)
-  - 1 columna buida després dels MP normals (etiquetada com a MP)
+La via CLI és útil per a proves o ús local tècnic, però no és la via recomanada per a desplegament.
 
 ## Desenvolupament
 
-El projecte utilitza:
-- `pandas` per a la manipulació de dades
-- `pdfplumber` per al processament de PDFs
-- `openpyxl` per a la generació de fitxers Excel
-- `tabulate` per a la sortida de depuració/desenvolupament
+Llibreries principals:
 
-## Contribuir
+- `Flask`
+- `gunicorn`
+- `pandas`
+- `pdfplumber`
+- `openpyxl`
+- `rich`
 
-1. Feu un _fork_ del repositori
-2. Creeu la teva branca de funció (`git checkout -b feature/AmazingFeature`)
-3. Feu _commit_ dels vostres canvis (`git commit -m 'Add some AmazingFeature'`)
-4. Pugeu la branca (`git push origin feature/AmazingFeature`)
-5. Obriu una _Pull Request_
+## Contribució
+
+1. Fes un fork del repositori.
+2. Crea una branca de treball.
+3. Fes els canvis.
+4. Obre una pull request.
 
 ## Llicència
 
-Aquest projecte està llicenciat sota la GNU General Public License v3.0 – consulteu el fitxer [LICENSE](LICENSE) per a més detalls.
-
-Això significa que podeu:
-- Utilitzar el programari per a qualsevol propòsit
-- Modificar el programari per adaptar-lo a les teves necessitats
-- Compartir el programari amb altra gent
-- Compartir els canvis que en facis
-
-Però heu de:
-- Compartir el codi font quan comparteixis el programari
-- Llicenciar qualsevol obra derivada sota GPL-3.0
-- Indicar canvis significatius realitzats al programari
-- Incloure la llicència original i els avisos de _copyright_
-
-## Agraïments
-
-- Creat per processar els informes de qualificacions educatives d'Esfer@
-- Dissenyat per gestionar formats de PDF específics del sistema educatiu català
+Aquest projecte es distribueix sota la llicència GNU GPL-3.0. Consulta [`LICENSE`](LICENSE).
