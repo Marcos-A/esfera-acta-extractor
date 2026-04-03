@@ -2,8 +2,9 @@
 set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
-ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env.local}"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/../.env.local}"
+ENV_DIR="$(CDPATH= cd -- "$(dirname "$ENV_FILE")" && pwd)"
+REPO_ROOT="${REPO_ROOT:-$ENV_DIR}"
 CRON_SCHEDULE="${CRON_SCHEDULE:-30 3 * * *}"
 CONTAINER_NAME="${CONTAINER_NAME:-esfera-acta-extractor-web}"
 HELPER_PATH="${HELPER_PATH:-/usr/local/bin/esfera2excel-retention-cleanup}"
