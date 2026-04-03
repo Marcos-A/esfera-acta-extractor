@@ -6,7 +6,7 @@ ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/../.env.local}"
 ENV_DIR="$(CDPATH= cd -- "$(dirname "$ENV_FILE")" && pwd)"
 REPO_ROOT="${REPO_ROOT:-$ENV_DIR}"
 CRON_SCHEDULE="${CRON_SCHEDULE:-30 3 * * *}"
-CONTAINER_NAME="${CONTAINER_NAME:-esfera-acta-extractor-web}"
+CONTAINER_NAME="${CONTAINER_NAME:-esfera2excel-web}"
 HELPER_PATH="${HELPER_PATH:-/usr/local/bin/esfera2excel-retention-cleanup}"
 CRON_LOG="${CRON_LOG:-/var/log/esfera2excel-retention.log}"
 

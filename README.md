@@ -102,7 +102,8 @@ Addicionalment, el codi històric encara pot generar resums de qualificacions al
 │   ├── cleanup_failed_uploads.py         # Neteja automàtica de fallades conservades
 │   ├── run-local-web.sh.example          # Plantilla d'arrencada local
 │   ├── run-retention-cleanup.sh.example  # Helper de neteja per a servidor
-│   └── install-retention-cron.sh.example # Instal·lador de cron per a neteja
+│   ├── install-retention-cron.sh.example # Instal·lador de cron per a neteja
+│   └── esfera2excel-retention.logrotate.example # Rotació del log de neteja
 ├── .env.local.example                    # Variables d'entorn locals de mostra
 ├── data/                                 # Base SQLite i dades persistides en local o al servidor
 ├── failed_uploads/                       # Errors conservats temporalment per a depuració
@@ -287,7 +288,7 @@ python3 scripts/cleanup_failed_uploads.py --dry-run
 ### Execució dins del contenidor en producció
 
 ```bash
-docker exec esfera-acta-extractor-web python scripts/cleanup_failed_uploads.py --retention-days 30 --max-size-mb 1024
+docker exec esfera2excel-web python scripts/cleanup_failed_uploads.py --retention-days 30 --max-size-mb 1024
 ```
 
 ### Helper i cron
@@ -304,13 +305,13 @@ Instal·lador de `cron` a partir del mateix `.env.local`:
 ```bash
 cp scripts/install-retention-cron.sh.example /usr/local/bin/esfera2excel-install-retention-cron
 chmod +x /usr/local/bin/esfera2excel-install-retention-cron
-ENV_FILE=/ruta/al/.env.local CONTAINER_NAME=esfera-acta-extractor-web /usr/local/bin/esfera2excel-install-retention-cron
+ENV_FILE=/ruta/al/.env.local CONTAINER_NAME=esfera2excel-web /usr/local/bin/esfera2excel-install-retention-cron
 ```
 
 Exemple de cron diari:
 
 ```cron
-30 3 * * * CONTAINER_NAME=esfera-acta-extractor-web FAILURE_RETENTION_DAYS=30 FAILURE_MAX_SIZE_MB=1024 /usr/local/bin/esfera2excel-retention-cleanup >> /var/log/esfera2excel-retention.log 2>&1
+30 3 * * * CONTAINER_NAME=esfera2excel-web FAILURE_RETENTION_DAYS=30 FAILURE_MAX_SIZE_MB=1024 /usr/local/bin/esfera2excel-retention-cleanup >> /var/log/esfera2excel-retention.log 2>&1
 ```
 
 Recomanació operativa:
@@ -318,6 +319,12 @@ Recomanació operativa:
 - usa `FAILURE_RETENTION_DAYS` com a regla principal
 - usa `FAILURE_MAX_SIZE_MB` com a límit de seguretat
 - conserva l'esborrat manual per als casos que ja hagis investigat
+
+Per evitar que el log del `cron` cresca sense límit, pots instal·lar també una regla de `logrotate`:
+
+```bash
+cp scripts/esfera2excel-retention.logrotate.example /etc/logrotate.d/esfera2excel-retention
+```
 
 ## Desplegament recomanat
 
@@ -365,8 +372,10 @@ El proxy ha de:
 
 ```bash
 docker run -d \
-  --name esfera-acta-extractor-web \
+  --name esfera2excel-web \
   -p 127.0.0.1:8000:8000 \
+  --log-opt max-size=10m \
+  --log-opt max-file=5 \
   -e SECRET_KEY=canvia-aquesta-clau \
   -e ADMIN_USERNAME=admin \
   -e ADMIN_PASSWORD=canvia-aquesta-contrasenya \
@@ -378,7 +387,7 @@ docker run -d \
   -e FAILURE_ROOT=/app/failed_uploads \
   -v /ruta/persistent/data:/app/data \
   -v /ruta/persistent/failed_uploads:/app/failed_uploads \
-  esfera-acta-extractor-web
+  esfera2excel-web
 ```
 
 Bones pràctiques:
@@ -386,6 +395,7 @@ Bones pràctiques:
 - no incrustis secrets a la imatge
 - no exposis el port directament a internet si hi ha proxy invers
 - canvia sempre `SECRET_KEY` i `ADMIN_PASSWORD`
+- limita els logs de Docker amb `--log-opt max-size` i `--log-opt max-file`
 
 ## Rutes HTTP útils
 
