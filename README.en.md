@@ -154,7 +154,7 @@ Both `run-local-web.sh` and `.env.local` are ignored by Git.
 You can also start the app without the helper script:
 
 ```bash
-docker build -t esfera-acta-extractor-web .
+docker build -t esfera2excel-web .
 
 docker run --rm -p 8000:8000 \
   -e SECRET_KEY=change-this-secret \
@@ -166,7 +166,7 @@ docker run --rm -p 8000:8000 \
   -e FAILURE_ROOT=/app/failed_uploads \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/failed_uploads:/app/failed_uploads" \
-  esfera-acta-extractor-web
+  esfera2excel-web
 ```
 
 ## Configuration

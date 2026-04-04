@@ -154,7 +154,7 @@ Els fitxers `run-local-web.sh` i `.env.local` estan ignorats per Git.
 També pots arrencar la web sense el helper:
 
 ```bash
-docker build -t esfera-acta-extractor-web .
+docker build -t esfera2excel-web .
 
 docker run --rm -p 8000:8000 \
   -e SECRET_KEY=canvia-aquesta-clau \
@@ -166,7 +166,7 @@ docker run --rm -p 8000:8000 \
   -e FAILURE_ROOT=/app/failed_uploads \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/failed_uploads:/app/failed_uploads" \
-  esfera-acta-extractor-web
+  esfera2excel-web
 ```
 
 ## Configuració
