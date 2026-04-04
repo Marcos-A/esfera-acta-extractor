@@ -20,11 +20,14 @@ AUDIT_SPEC = importlib.util.spec_from_file_location("cleanup_audit", AUDIT_MODUL
 if AUDIT_SPEC is None or AUDIT_SPEC.loader is None:
     raise RuntimeError(f"Unable to load audit module from {AUDIT_MODULE_PATH}")
 AUDIT_MODULE = importlib.util.module_from_spec(AUDIT_SPEC)
+# Load AuditStore directly from the repository so this maintenance script can run
+# without requiring the project to be installed as a Python package first.
 AUDIT_SPEC.loader.exec_module(AUDIT_MODULE)
 AuditStore = AUDIT_MODULE.AuditStore
 
 
 def main() -> int:
+    """Delete retained failed-upload artifacts based on age and optional size limits."""
     args = _parse_args()
     audit_store = AuditStore(args.audit_db)
     now = datetime.now(timezone.utc)
@@ -40,6 +43,8 @@ def main() -> int:
         max_bytes = args.max_size_mb * 1024 * 1024
         jobs = audit_store.list_error_jobs()
         while _folder_size_bytes(args.failure_root) > max_bytes:
+            # Once the folder grows past the configured cap, remove the oldest retained
+            # failures first so the newest debugging material stays available longer.
             next_job = _oldest_job_with_artifacts(jobs)
             if next_job is None:
                 break
@@ -53,6 +58,7 @@ def main() -> int:
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse command-line options and environment-based defaults."""
     parser = argparse.ArgumentParser(description="Clean retained failed uploads.")
     parser.add_argument(
         "--failure-root",
@@ -87,6 +93,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _should_delete_by_age(job: dict[str, Any], now: datetime, retention_days: int) -> bool:
+    """Return True when a failed job is older than the configured retention window."""
     if retention_days < 0 or not _job_has_artifacts(job):
         return False
     reference = job.get("completed_at") or job.get("created_at")
@@ -103,6 +110,7 @@ def _oldest_job_with_artifacts(jobs: list[dict[str, Any]]) -> dict[str, Any] | N
 
 
 def _job_has_artifacts(job: dict[str, Any]) -> bool:
+    """Check both the main debug path and the per-file metadata paths stored in JSON."""
     metadata = _load_metadata(job.get("metadata_json"))
     debug_path = job.get("debug_path")
     if debug_path and Path(str(debug_path)).exists():
@@ -121,6 +129,7 @@ def _cleanup_job_artifacts(
     reason: str,
     dry_run: bool,
 ) -> bool:
+    """Delete one job's retained artifacts and mirror that change back into the audit DB."""
     metadata = _load_metadata(job.get("metadata_json"))
     debug_path_value = job.get("debug_path")
     if not debug_path_value:
@@ -154,6 +163,7 @@ def _cleanup_job_artifacts(
 
 
 def _load_metadata(raw_metadata: Any) -> dict[str, Any]:
+    """Safely decode metadata blobs that may be empty or malformed."""
     if not raw_metadata:
         return {}
     try:
@@ -171,6 +181,7 @@ def _parse_utc(value: str) -> datetime:
 
 
 def _folder_size_bytes(path: Path) -> int:
+    """Measure disk usage recursively for the retained-failures folder."""
     if not path.exists():
         return 0
     total = 0

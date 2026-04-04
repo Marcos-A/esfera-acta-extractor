@@ -1,5 +1,8 @@
 """
-Esfer@ Acta Extractor package.
+Public package exports for the Esfer@ conversion pipeline.
+
+Keeping the main helpers here makes both the CLI script and any future integrations
+import from a single stable location.
 """
 
 from .pdf_processor import extract_tables, extract_group_code

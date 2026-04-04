@@ -10,6 +10,9 @@ import numpy as np
 def normalize_headers(df: pd.DataFrame) -> pd.DataFrame:
     """
     Collapse multiline headers into single-line, trimmed names.
+
+    PDF table extraction often keeps line breaks from the original layout, which makes
+    later column matching brittle unless headers are normalized first.
     """
     df = df.copy()
     df.columns = (
@@ -26,6 +29,9 @@ def drop_irrelevant_columns(
 ) -> pd.DataFrame:
     """
     Drop columns named in irrelevant_columns (with optional .n suffix).
+
+    Some exports duplicate headers with suffixes such as ".1", so the regex removes
+    both the original and duplicated versions.
     """
     df = df.copy()
     pattern = re.compile(
@@ -41,8 +47,10 @@ def forward_fill_names(
     name_keyword: str
 ) -> tuple[pd.DataFrame, str]:
     """
-    Locate the name column by keyword, blank->NaN, then forward-fill.
-    Returns updated df and column name.
+    Locate the student-name column and forward-fill blank cells.
+
+    Esfer@ tables often print the student name once and leave the following rows blank
+    for related grades, so later grouping depends on copying the name downward.
     """
     df = df.copy()
     name_col = next(
@@ -59,6 +67,9 @@ def forward_fill_names(
 def join_nonempty(series: pd.Series) -> str:
     """
     Join non-empty values in a group with newline separators.
+
+    Keeping the original fragments together lets the regex stage extract multiple
+    RA/EM/MP entries from one reconstructed text block.
     """
     return "\n".join(str(v).strip() for v in series.dropna() if str(v).strip())
 
@@ -84,6 +95,9 @@ def select_melt_code_conv_grades(
 def clean_entries(series: pd.Series) -> pd.Series:
     """
     Normalize whitespace and reattach RA/EM suffixes.
+
+    PDF extraction sometimes inserts spaces before "RA" or "EM", which would stop the
+    grade-matching regexes from recognizing otherwise valid codes.
     """
     s = series.astype(str).str.replace(r"\s+", ' ', regex=True).str.strip()
     return s.str.replace(

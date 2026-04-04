@@ -212,6 +212,7 @@
       <section class="panels">
         <div class="panel">
           <h2>Recent Jobs</h2>
+          <!-- Job-level records answer "what happened to the whole upload?" even when one ZIP contains many PDFs. -->
           <div class="note">Most recent conversion requests across PDF and ZIP uploads.</div>
           <table>
             <thead>
@@ -267,6 +268,7 @@
 
         <div class="panel">
           <h2>Recent Files</h2>
+          <!-- File-level rows make partial ZIP failures visible without opening the SQLite database directly. -->
           <div class="note">Per-file conversion records, useful when ZIP uploads contain several PDFs.</div>
           <table>
             <thead>

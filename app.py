@@ -42,6 +42,7 @@ from src.notifier import notify_failure
 
 
 def create_app() -> Flask:
+    """Create the Flask application used by the public upload flow and admin UI."""
     app = Flask(__name__)
     default_data_dir = str(Path(app.root_path) / "data")
     default_failure_dir = str(Path(app.root_path) / "failed_uploads")
@@ -266,6 +267,7 @@ def create_app() -> Flask:
 
 
 def _admin_required(view_func):
+    """Redirect unauthenticated admin requests to the login page."""
     @wraps(view_func)
     def wrapped(*args, **kwargs):
         if not session.get("admin_authenticated"):
@@ -276,6 +278,7 @@ def _admin_required(view_func):
 
 
 def _valid_admin_credentials(app: Flask, username: str, password: str) -> bool:
+    """Compare credentials in constant time to avoid leaking partial matches."""
     return hmac.compare_digest(username, app.config["ADMIN_USERNAME"]) and hmac.compare_digest(
         password,
         app.config["ADMIN_PASSWORD"],
@@ -289,6 +292,7 @@ def _retain_failed_job(
     upload_path: Path,
     work_dir: Path,
 ) -> Path:
+    """Keep failed inputs and partial outputs so administrators can inspect conversion errors later."""
     target_dir = Path(failure_root) / job_id
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -311,6 +315,13 @@ def _run_conversion_job(
     upload_path: Path,
     work_dir: Path,
 ) -> None:
+    """
+    Run the conversion in a background thread and keep the audit trail updated.
+
+    The web request returns immediately with a job id, so this worker is responsible for
+    recording progress, preserving failed artifacts, and cleaning temporary files when
+    processing succeeds.
+    """
     extracted_dir: Path | None = None
     source_file_count = 1
     app.audit_store.mark_started(job_id)
@@ -366,6 +377,8 @@ def _run_conversion_job(
 
         for index, pdf_path in enumerate(pdf_paths, start=1):
             try:
+                # ZIP uploads are processed one PDF at a time so the status endpoint can
+                # show meaningful progress instead of a single long-running "busy" state.
                 app.audit_store.update_progress(
                     job_id,
                     stage="processing",
@@ -477,6 +490,7 @@ def _run_conversion_job(
 
 
 def _present_admin_job(job: dict[str, object]) -> dict[str, object]:
+    """Add derived admin-only flags so the template can stay simple."""
     presented = dict(job)
     metadata = _load_metadata(job.get("metadata_json"))
     failed_source_path = metadata.get("failed_source_path")
@@ -489,6 +503,7 @@ def _present_admin_job(job: dict[str, object]) -> dict[str, object]:
 
 
 def _delete_job_artifacts(app: Flask, job: dict[str, object], *, reason: str) -> None:
+    """Delete retained debug files while preserving an audit note about why they were removed."""
     metadata = _load_metadata(job.get("metadata_json"))
     debug_path_value = job.get("debug_path") or metadata.get("debug_path")
     if debug_path_value:
@@ -514,6 +529,7 @@ def _delete_job_artifacts(app: Flask, job: dict[str, object], *, reason: str) ->
 
 
 def _load_metadata(raw_metadata: str | None) -> dict[str, object]:
+    """Safely decode stored JSON metadata from the audit database."""
     if not raw_metadata:
         return {}
     try:
@@ -524,6 +540,7 @@ def _load_metadata(raw_metadata: str | None) -> dict[str, object]:
 
 
 def _download_mimetype(output_path: Path) -> str:
+    """Return a download content type that matches the generated artifact."""
     if output_path.suffix.lower() == ".zip":
         return "application/zip"
     if output_path.suffix.lower() == ".pdf":
@@ -532,6 +549,7 @@ def _download_mimetype(output_path: Path) -> str:
 
 
 def _find_failed_source_path(debug_path: Path) -> Path | None:
+    """Return the original uploaded file stored for a failed job, if present."""
     for path in debug_path.iterdir():
         if path.is_file() and path.name != "failure.log":
             return path
@@ -548,6 +566,7 @@ def _write_failure_log(
     traceback_text: str,
     job: dict[str, object] | None,
 ) -> Path:
+    """Write a human-readable failure report alongside retained debug artifacts."""
     log_path = debug_path / "failure.log"
     console = Console(record=True, width=120)
     console.print(

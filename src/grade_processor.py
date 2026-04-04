@@ -23,7 +23,7 @@ def extract_records(
         for code, grade in entry_pattern.findall(row['entry']):
             # Normalize whitespace in code
             code = re.sub(r"\s+", "", code)
-            # Transform grade
+            # Keep numeric grades numeric so Excel formulas and sorting behave naturally.
             if grade.startswith('A') and grade[1:].isdigit():
                 # 'A7' → 7
                 grade_val = int(grade[1:])
@@ -45,6 +45,9 @@ def extract_records(
 def extract_mp_codes(records: pd.DataFrame) -> list[str]:
     """
     Extract unique MP codes from RA codes.
+
+    RA records are the most reliable place to discover the MP structure because every
+    detailed assessment line includes its parent MP prefix.
     """
     mp_pattern = re.compile(r'^([A-Za-z0-9]+)_')
     mp_codes = records['code'].str.extract(mp_pattern, expand=False)
@@ -71,7 +74,7 @@ def find_mp_codes_with_em(melted: pd.DataFrame, mp_codes: list[str]) -> list[str
     mp_with_em = set()
     mp_pattern = re.compile(r'^([A-Za-z0-9]+)_')
     
-    # Process entries until we've found all possible MPs with EM
+    # Stop early once every known MP has been matched. This keeps large ZIP batches fast.
     for entry in melted['entry']:
         # Check if entry contains any EM pattern
         if 'EM' not in str(entry):
@@ -95,7 +98,7 @@ def find_mp_codes_with_em(melted: pd.DataFrame, mp_codes: list[str]) -> list[str
 
 def sort_records(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Clean names, sort and save to semicolon-delimited CSV.
+    Clean student names and sort records in a predictable order.
     """
     df['estudiant'] = df['estudiant'].str.replace(r"\s*\n\s*", ' ', regex=True).str.strip()
     df = df.sort_values(

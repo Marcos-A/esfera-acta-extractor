@@ -15,6 +15,7 @@ def apply_row_formatting(
     mp_codes_with_em: list[str],
     mp_codes: list[str],
 ) -> None:
+    """Apply the visual layout that staff expects in the exported workbook."""
     from openpyxl import load_workbook
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -25,6 +26,8 @@ def apply_row_formatting(
     last_row = ws.max_row
     ws.freeze_panes = 'C2'
 
+    # Centralize workbook styling here so the exported files look consistent even though
+    # the sheet structure is assembled in a separate step.
     # Styles
     border = Border(
         left=Side(style='thin'),
@@ -50,6 +53,7 @@ def apply_row_formatting(
     STANDARD_ROW_HEIGHT = 25
 
     def format_ra_header(header: str) -> str:
+        """Break long RA headers over two lines so they stay readable in narrow columns."""
         if not header or header.count('_') < 2:
             return header
         first = header.find('_')
@@ -57,6 +61,7 @@ def apply_row_formatting(
         return f"{header[:second + 1]}\n{header[second + 1:]}"
 
     def get_mp_for_ra(ra_header: str) -> Optional[str]:
+        """Map an RA column back to its MP so the correct color can be reused."""
         for mp_code in mp_codes:
             if ra_header.startswith(mp_code + "_") and ra_header.endswith("RA"):
                 return mp_code
@@ -122,6 +127,8 @@ def apply_row_formatting(
         else:
             ws.column_dimensions[col_letter].width = RA_COLUMN_WIDTH
 
+    # Insert a legend directly in the workbook because many recipients open the file
+    # without separate documentation or prior knowledge of the color scheme.
     # Insert legend after student list with one empty row in between
     legend_start_row = last_row + 2
 
@@ -150,6 +157,7 @@ def apply_conditional_formatting(
     mp_codes_with_em: list[str],
     mp_codes: list[str],
 ) -> None:
+    """Highlight values that need review, such as missing grades or failing marks."""
     from openpyxl import load_workbook
     from openpyxl.formatting.rule import FormulaRule
     from openpyxl.styles import PatternFill, Font
@@ -164,6 +172,7 @@ def apply_conditional_formatting(
     red_font = Font(color="FF0000")
 
     def get_column_for_header(header: str) -> str:
+        """Find columns by visible header text after header wrapping has been applied."""
         header_clean = str(header).replace('\n', '')
         for cell in ws[1]:
             if cell.value and str(cell.value).replace('\n', '') == header_clean:
@@ -186,6 +195,8 @@ def apply_conditional_formatting(
             )
             ws.conditional_formatting.add(cell_ref, orange_rule)
 
+            # Red fill for unexpected text catches parsing problems and manual edits that
+            # fall outside the allowed grade markers.
             # Red fill for invalid entries (non-number and not one of the above)
             red_fill_formula = (
                 f'AND(NOT(ISNUMBER({cell_ref})),'
@@ -240,6 +251,8 @@ def export_excel_with_spacing(
     Export DataFrame to Excel with specific column spacing after each MP's RAs.
     Adds a "#" column with sequential numbers at the beginning.
     """
+    # MP grade columns are renamed to the short MP code, while detailed RA/EM columns
+    # keep their full identifier so the final workbook remains understandable.
     non_mp_columns = [col for col in df.columns
                          if col.endswith(('EM', 'RA')) or col == 'estudiant']
     df = df.rename(columns=lambda col: col.split('_')[0] if col not in non_mp_columns else col)
@@ -306,6 +319,8 @@ def export_excel_with_spacing(
         return None
 
     if em_to_mp:
+        # EM values are copied into the user-facing "EMPRESA" column and the raw EM
+        # column is removed so recipients see business terminology instead of parser terms.
         for em_code, mp_code in em_to_mp.items():
             empresa_header = f'{mp_code} EMPRESA'
             em_col = get_col_letter(em_code)
@@ -337,6 +352,7 @@ def export_excel_with_spacing(
 
 
 def _blank_literal_na(df: pd.DataFrame) -> pd.DataFrame:
+    """Clear text cells containing the literal marker 'NA' before exporting to Excel."""
     cleaned_df = df.copy()
     object_columns = cleaned_df.select_dtypes(include=['object', 'string']).columns
     if len(object_columns) > 0:

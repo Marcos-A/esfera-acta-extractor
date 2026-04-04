@@ -14,6 +14,7 @@ from typing import Any
 
 
 class AuditStore:
+    """Persist job history so background conversions can be tracked outside request memory."""
     def __init__(self, db_path: str | os.PathLike[str]) -> None:
         self.db_path = str(db_path)
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -307,6 +308,7 @@ class AuditStore:
         )
 
     def get_summary(self) -> dict[str, Any]:
+        """Return compact counts for the admin dashboard cards."""
         jobs = self._query_one(
             """
             SELECT
@@ -340,6 +342,7 @@ class AuditStore:
         )
 
     def _init_db(self) -> None:
+        """Create the audit tables and add newer columns when upgrading older databases."""
         self._execute(
             """
             CREATE TABLE IF NOT EXISTS conversion_jobs (
@@ -409,6 +412,7 @@ class AuditStore:
             return dict(row) if row else None
 
     def _ensure_column(self, table_name: str, column_name: str, column_type: str, default_sql: str = "") -> None:
+        """Perform a lightweight schema migration without requiring a separate tool."""
         with closing(sqlite3.connect(self.db_path)) as connection:
             cursor = connection.execute(f"PRAGMA table_info({table_name})")
             existing_columns = {row[1] for row in cursor.fetchall()}
@@ -420,4 +424,5 @@ class AuditStore:
 
 
 def _utc_now() -> str:
+    """Store timestamps in UTC ISO format so sorting and retention logic stay consistent."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")

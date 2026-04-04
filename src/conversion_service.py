@@ -33,6 +33,7 @@ from .pdf_processor import extract_group_code, extract_tables
 
 @dataclass
 class ConversionArtifact:
+    """Describes one generated file so callers can package or report it consistently."""
     source_name: str
     output_name: str
     output_path: Path
@@ -40,6 +41,7 @@ class ConversionArtifact:
 
 @dataclass
 class ConversionResult:
+    """Collects all files produced from a single request."""
     artifacts: list[ConversionArtifact]
 
 def convert_pdf_to_excel(
@@ -47,7 +49,10 @@ def convert_pdf_to_excel(
     output_dir: str | Path,
 ) -> Path:
     """
-    Process a single PDF file and generate the corresponding Excel output.
+    Process one Esfer@ acta PDF and write its Excel workbook.
+
+    This function owns the full parsing pipeline: table extraction, cleanup, record
+    detection, reshaping, and final workbook formatting.
     """
     pdf_path = Path(pdf_path)
     output_dir = Path(output_dir)
@@ -62,6 +67,8 @@ def convert_pdf_to_excel(
     combined = drop_irrelevant_columns(combined, ["MC", "H", "Pas de curs", "MH"])
     filled, name_col = forward_fill_names(combined, "nom i cognoms")
     merged = (
+        # Some PDFs split a single student across multiple table rows. Grouping by the
+        # filled name column reconstructs the original logical row before regex parsing.
         filled.set_index(name_col)
         .groupby(level=0, sort=False)
         .agg(join_nonempty)
@@ -120,6 +127,8 @@ def convert_pdf_to_excel(
     wide = combined_records.pivot(index="estudiant", columns="code", values="grade")
     for col in wide.columns:
         if col != "estudiant":
+            # Excel should receive numbers as numbers so conditional formatting works,
+            # but status markers like PDT or EP must remain as text.
             str_series = wide[col].astype(str)
             numeric_series = pd.to_numeric(wide[col], errors="coerce")
             wide[col] = numeric_series.combine(
@@ -141,6 +150,7 @@ def convert_pdf_collection(
     pdf_paths: list[Path],
     output_dir: str | Path,
 ) -> ConversionResult:
+    """Convert several PDFs and return metadata for every generated workbook."""
     artifacts: list[ConversionArtifact] = []
     for pdf_path in pdf_paths:
         output_path = convert_pdf_to_excel(pdf_path, output_dir)
@@ -158,6 +168,7 @@ def convert_input_directory(
     input_dir: str | Path,
     output_dir: str | Path,
 ) -> ConversionResult:
+    """Batch-convert every PDF found in an input directory."""
     pdf_paths = sorted(Path(input_dir).glob("*.pdf"))
     if not pdf_paths:
         raise FileNotFoundError("No PDF files found in the input directory.")
@@ -167,6 +178,9 @@ def convert_input_directory(
 def extract_zip_to_temp(zip_path: str | Path) -> tuple[Path, list[Path]]:
     """
     Extract only PDFs from a ZIP into a temp directory.
+
+    Hidden files and non-PDF members are ignored because users often upload ZIP files
+    created by desktop tools that include extra metadata entries.
     """
     work_dir = Path(tempfile.mkdtemp(prefix="esfera-upload-"))
     pdf_paths: list[Path] = []
@@ -191,6 +205,7 @@ def extract_zip_to_temp(zip_path: str | Path) -> tuple[Path, list[Path]]:
 
 
 def build_zip_from_artifacts(artifacts: list[ConversionArtifact], destination: str | Path) -> Path:
+    """Package generated artifacts into a download ZIP, deduplicating file names if needed."""
     destination = Path(destination)
     archive_names: set[str] = set()
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -202,6 +217,7 @@ def build_zip_from_artifacts(artifacts: list[ConversionArtifact], destination: s
 
 
 def cleanup_path(path: str | Path) -> None:
+    """Delete a file or directory if it still exists."""
     target = Path(path)
     if target.is_dir():
         shutil.rmtree(target, ignore_errors=True)
@@ -210,6 +226,7 @@ def cleanup_path(path: str | Path) -> None:
 
 
 def _dedupe_name(name: str, existing_names: set[str]) -> str:
+    """Keep archive members unique when different inputs would generate the same name."""
     candidate = name
     stem = Path(name).stem
     suffix = Path(name).suffix

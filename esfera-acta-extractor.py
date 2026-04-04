@@ -6,9 +6,13 @@ from src.conversion_service import convert_input_directory
 
 def main() -> None:
     """
-    Main function to process all PDF files in the input directory.
-    """    
-    # Create output directory if it doesn't exist
+    Run the original command-line workflow for local batch processing.
+
+    This entrypoint predates the web UI and is still useful for staff who want to drop
+    PDFs into the repository folders and generate both detailed and summary workbooks.
+    """
+    # Keep the folder names explicit so non-technical users can follow the repository
+    # structure without having to trace configuration values.
     input_dir = '01_source_pdfs'
     output_dir = '02_extracted_data'
     os.makedirs(output_dir, exist_ok=True)
@@ -37,7 +41,8 @@ def main() -> None:
         print("No valid processed XLSX files found in '02_extracted_data' to summarize.")
     else:
         print("\nGenerating summary reports...")
-        # Import here to avoid circular dependency if summary_generator grows
+        # Imported lazily so the CLI can finish the extraction phase even if summary
+        # generation changes its dependencies later.
         from src.summary_generator import generate_summary_report 
         for source_xlsx_file in actual_source_xlsx_files:
             summary_file_name = f"qualificacions_MP-{os.path.basename(source_xlsx_file)}"

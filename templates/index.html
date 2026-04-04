@@ -164,6 +164,8 @@
       </div>
     </main>
     <script>
+      // The upload page stays on a single screen and polls the server for progress,
+      // which is easier for staff than waiting on a long request with no feedback.
       const form = document.getElementById("convert-form");
       const fileInput = document.getElementById("file");
       const submitButton = document.getElementById("submit-button");
@@ -230,6 +232,7 @@
               pollTimer = null;
               submitButton.disabled = false;
               setProgress(100);
+              // Trigger the browser download as soon as the backend marks the artifact ready.
               window.location.href = downloadUrl;
               return;
             }
@@ -262,6 +265,7 @@
       }
 
       function stageLabel(payload) {
+        // Translate backend stage ids into friendly status text for the public UI.
         if (payload.status === "success") {
           return "Descàrrega preparada.";
         }

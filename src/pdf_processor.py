@@ -9,6 +9,9 @@ import pandas as pd
 def extract_tables(pdf_path: str, table_opts: dict = None) -> list[pd.DataFrame]:
     """
     Extract all tables from a PDF, one DataFrame per table found.
+
+    The default pdfplumber settings are tuned for Esfer@ reports, which use visible
+    table lines and benefit from a small snap tolerance.
     """
     if table_opts is None:
         table_opts = {
@@ -38,6 +41,8 @@ def extract_group_code(pdf_path: str) -> str:
         first_page = pdf.pages[0]
         text = first_page.extract_text()
         
+        # In the current report layout the actual group code is printed on the next line,
+        # so we read line-by-line instead of relying on a more fragile page-wide regex.
         # Find the line after "Codi del grup"
         lines = text.split('\n')
         for i, line in enumerate(lines):
@@ -46,4 +51,4 @@ def extract_group_code(pdf_path: str) -> str:
                 group_code = lines[i + 1].strip()
                 return group_code.replace(' ', '_')
     
-    return 'unknown_group'  # Fallback if code not found 
+    return 'unknown_group'  # Fallback keeps conversion running even if naming metadata is missing.

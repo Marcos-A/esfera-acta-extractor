@@ -1,3 +1,10 @@
+"""
+Generate a simplified workbook that only includes the final MP-level grades.
+
+The full extraction workbook is detailed and useful for auditing, while this summary
+report is designed for quicker review and manual editing by teaching staff.
+"""
+
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
@@ -9,7 +16,7 @@ import os
 import time
 
 def _extract_mp_codes_from_columns(columns: list[str]) -> list[str]:
-    """Extracts unique 4-digit MP codes from a list of column names."""
+    """Extract the MP codes implied by workbook column names."""
     mp_codes = set()
     mp_pattern = re.compile(r"^(?P<code>[A-Za-z0-9]{3,5})(?:_.*RA| CENTRE| EMPRESA)?$")
     for col in columns:
@@ -24,6 +31,12 @@ MAX_READ_ATTEMPTS = 3
 READ_RETRY_DELAY_SECONDS = 5
 
 def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
+    """
+    Build a smaller summary workbook from a detailed conversion result.
+
+    The summary keeps only the student column plus the final MP columns that staff
+    usually edit or review after the initial conversion.
+    """
     df_source = None
 
     for attempt in range(1, MAX_READ_ATTEMPTS + 1):
@@ -54,6 +67,8 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
             regex=True
         )
 
+    # The source workbook appends a legend below the data. The first fully empty row
+    # marks where the student list stops and the explanatory footer begins.
     # Detect actual student data rows by finding the first completely empty row
     empty_row_index = df_source[df_source.isnull().all(axis=1)].index
     if not empty_row_index.empty:
@@ -90,7 +105,8 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
     with pd.ExcelWriter(output_summary_path, engine='openpyxl') as writer:
         summary_df.to_excel(writer, index=False, sheet_name='Summary')
 
-    # print(f"[INFO summary_generator] Summary report created: {output_summary_path}")
+    # The file is written once here to establish the basic sheet, then opened again for
+    # formatting because openpyxl styling is easier to express on an existing workbook.
 
     # Find the actual student column name (case-insensitive)
     student_col_actual_name = None
@@ -157,6 +173,8 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
                 if current_mp_info:
                     cell.fill = PatternFill(start_color=current_mp_info['header_bg'], end_color=current_mp_info['header_bg'], fill_type="solid")
 
+        # Data validation rules reflect the grading rules used by the school:
+        # company-placement modules accept decimals, while other modules expect integers.
         # First, collect all data validations to apply to columns
         data_validations = {}
         for col_idx, col_name in enumerate(summary_df.columns, 1):
@@ -275,6 +293,8 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
                     else:
                         cell.number_format = '0'  # Integer for Type B
         
+        # Conditional formatting turns the summary into a working checklist by calling
+        # attention to missing values, special markers, and grades below the threshold.
         # Add conditional formatting to highlight empty or non-numeric cells in red
         red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
         
@@ -344,6 +364,8 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
             adjusted_width = (max_length + 2) if max_length > 0 else len(str(column_name)) + 2
             ws.column_dimensions[column_letter].width = adjusted_width
 
+        # Add the grading legend directly in the summary so printed copies still explain
+        # the different MP color meanings without needing the detailed workbook.
         # Add legend at the bottom of the sheet
         legend_start_row = ws.max_row + 2  # Leave one empty row after the data
 

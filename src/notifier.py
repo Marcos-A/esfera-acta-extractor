@@ -40,6 +40,7 @@ def _safe_send(
 
 
 def _send_telegram_message(subject: str, body: str) -> bool:
+    """Send a plain-text Telegram alert when bot credentials are configured."""
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if not bot_token or not chat_id:
@@ -64,6 +65,7 @@ def _send_telegram_message(subject: str, body: str) -> bool:
 
 
 def _send_smtp_message(subject: str, body: str) -> bool:
+    """Send an email alert using either implicit SSL or STARTTLS, depending on settings."""
     host = os.getenv("SMTP_HOST")
     port = os.getenv("SMTP_PORT")
     username = os.getenv("SMTP_USERNAME")
@@ -99,6 +101,7 @@ def _send_smtp_message(subject: str, body: str) -> bool:
 
 
 def _send_webhook_message(subject: str, body: str) -> bool:
+    """Send a simple JSON payload to any generic webhook endpoint."""
     webhook_url = os.getenv("ALERT_WEBHOOK_URL")
     if not webhook_url:
         return False
