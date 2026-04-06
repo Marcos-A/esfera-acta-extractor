@@ -4,7 +4,7 @@
 
 Aplicació per convertir actes d'Esfer@ en PDF a fitxers Excel. El projecte inclou:
 
-- una aplicació web per pujar un PDF o un ZIP amb diversos PDFs
+- una aplicació web per pujar un o diversos PDFs, o un ZIP amb diversos PDFs
 - una àrea d'administració a `/admin` per consultar conversions, errors i artefactes conservats
 - una via CLI antiga per processar lots locals des del repositori
 
@@ -15,6 +15,7 @@ La forma recomanada d'ús i desplegament és la versió web amb Docker.
 La web accepta:
 
 - un únic fitxer `.pdf`, i retorna un únic `.xlsx`
+- diversos fitxers `.pdf` seleccionats alhora, i retorna un únic `.zip` amb un `.xlsx` per cada PDF convertit
 - un fitxer `.zip` amb diversos PDFs, i retorna un `.zip` amb un `.xlsx` per cada PDF convertit
 
 La conversió reutilitza la lògica històrica del projecte per:
@@ -30,7 +31,8 @@ Els valors literals `NA` es tracten com a cel·les buides.
 ### Aplicació web
 
 - Interfície pública en català
-- Pujada de PDF o ZIP
+- Pujada d'un o diversos PDFs, o d'un ZIP
+- Selecció acumulativa de fitxers des del navegador abans d'iniciar la conversió
 - Seguiment asíncron del progrés de conversió
 - Missatges d'estat intermedis, com ara descompressió, conversió i compressió final
 - Missatges d'error públics pensats per a usuaris finals
@@ -54,7 +56,7 @@ Els valors literals `NA` es tracten com a cel·les buides.
 
 ## Arquitectura funcional
 
-1. L'usuari puja un PDF o un ZIP.
+1. L'usuari puja un PDF, diversos PDFs o un ZIP.
 2. La web desa temporalment el fitxer en un directori de treball.
 3. Un fil en segon pla processa la conversió.
 4. La UI consulta l'estat via API i mostra una barra de progrés.
@@ -216,6 +218,14 @@ Política de retenció:
 - es converteix cada PDF a Excel
 - es genera un ZIP final amb tots els `.xlsx`
 - el ZIP original i el directori temporal s'eliminen després
+
+### Per a diversos PDFs seleccionats
+
+- la UI permet afegir fitxers en diverses vegades abans d'enviar-los
+- els PDFs seleccionats es processen com un únic lot
+- el resultat es descarrega com a `selected_files-converted.zip`
+- si alguns fitxers fallen però n'hi ha d'altres que es poden convertir, es retorna el ZIP amb els fitxers correctes i la UI mostra l'avís corresponent
+- si fallen tots els fitxers del lot, no es genera cap ZIP i es mostra un missatge d'error
 
 ### En cas d'error
 

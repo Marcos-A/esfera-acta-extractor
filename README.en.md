@@ -4,7 +4,7 @@
 
 Application for converting Esfer@ PDF grade reports into Excel files. The project includes:
 
-- a web app that accepts a single PDF or a ZIP containing multiple PDFs
+- a web app that accepts one or more PDFs, or a ZIP containing multiple PDFs
 - an admin area at `/admin` to inspect jobs, failures, and retained debug artifacts
 - the original CLI workflow for local batch processing
 
@@ -15,6 +15,7 @@ The recommended way to use and deploy the project is the web version with Docker
 The web app accepts:
 
 - a single `.pdf` file and returns a single `.xlsx`
+- multiple `.pdf` files selected at once and returns a single `.zip` containing one `.xlsx` per converted PDF
 - a `.zip` file containing multiple PDFs and returns a `.zip` containing one `.xlsx` per converted PDF
 
 The conversion pipeline reuses the original project logic to:
@@ -31,6 +32,7 @@ Literal `NA` values are treated as empty cells.
 
 - Public interface in Catalan
 - PDF or ZIP upload
+- Cumulative file selection in the browser before starting conversion
 - Asynchronous conversion flow
 - Progress bar with intermediate status messages
 - User-friendly public error messages
@@ -216,6 +218,14 @@ Retention policy:
 - each PDF is converted to Excel
 - a final ZIP is generated with all `.xlsx` files
 - the original ZIP and the temporary working directory are then deleted
+
+### For multiple selected PDFs
+
+- the UI lets the user add files in several passes before submitting
+- the selected PDFs are processed as one batch
+- the result is downloaded as `selected_files-converted.zip`
+- if some files fail but others succeed, the app returns a ZIP with the successful conversions and shows a warning in the UI
+- if every file in the batch fails, no ZIP is produced and the UI shows an error
 
 ### On failure
 

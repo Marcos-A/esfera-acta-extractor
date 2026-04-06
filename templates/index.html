@@ -58,8 +58,11 @@
         background: rgba(255, 255, 255, 0.62);
       }
       input[type="file"] {
-        width: 100%;
-        font: inherit;
+        position: absolute;
+        inline-size: 1px;
+        block-size: 1px;
+        opacity: 0;
+        pointer-events: none;
       }
       button {
         appearance: none;
@@ -126,8 +129,74 @@
         color: var(--muted);
         margin-top: 6px;
       }
+      .status-warning {
+        margin-top: 12px;
+        font-weight: 700;
+      }
+      .status-warning[hidden] {
+        display: none;
+      }
+      .status-warning ul {
+        margin: 8px 0;
+        padding-left: 20px;
+      }
       .error {
         color: var(--error);
+      }
+      .picker-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+      }
+      .picker-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 10px 16px;
+        font-weight: 700;
+        color: white;
+        background: linear-gradient(135deg, var(--accent), #125f8c);
+        cursor: pointer;
+      }
+      .picker-summary {
+        color: var(--muted);
+      }
+      .selected-files {
+        margin: 14px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 10px;
+        opacity: 1;
+        transform: translateY(0);
+        transition: opacity 220ms ease, transform 220ms ease;
+      }
+      .selected-files[hidden] {
+        display: none;
+      }
+      .selected-files.fading-out {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+      .selected-file {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.82);
+      }
+      .selected-file-name {
+        overflow-wrap: anywhere;
+      }
+      .remove-file {
+        padding: 8px 12px;
+        background: #efe4d2;
+        color: var(--ink);
       }
     </style>
   </head>
@@ -136,14 +205,22 @@
       <div class="badge">Conversor Esfer@2Excel</div>
       <h1>Carrega les actes d'Esfer@ en PDF i obtingues-les convertides a Excel.</h1>
       <p class="lede">
-        Carrega un únic PDF per rebre un fitxer Excel, o bé un ZIP amb diversos PDFs per rebre un ZIP amb tots els fulls convertits.
+        Carrega un o diversos PDFs per rebre el resultat convertit, o bé un ZIP amb diversos PDFs per rebre un ZIP amb tots els fulls convertits.
       </p>
       <form id="convert-form" action="/convert" method="post" enctype="multipart/form-data">
         <div class="panel">
           <label for="file"><strong>Fitxer PDF o ZIP</strong></label>
-          <input id="file" name="file" type="file" accept=".pdf,.zip,application/pdf,application/zip" required>
+          <input id="file" name="file" type="file" accept=".pdf,.zip,application/pdf,application/zip" multiple>
+          <div class="picker-row">
+            <label class="picker-button" for="file">Afegeix fitxers</label>
+            <span id="picker-summary" class="picker-summary">Cap fitxer seleccionat.</span>
+          </div>
+          <p id="file-help">
+            Pots afegir fitxers en diverses vegades. Si hi ha més d'un fitxer, tots han de ser PDF.
+          </p>
+          <ul id="selected-files" class="selected-files" hidden></ul>
         </div>
-        <button id="submit-button" type="submit">Converteix el fitxer</button>
+        <button id="submit-button" type="submit">Converteix els fitxers</button>
       </form>
       <div id="status-panel" class="panel status-panel" aria-live="polite">
         <div class="status-top">
@@ -155,6 +232,7 @@
         </div>
         <div id="status-message" class="status-message">Esperant per començar.</div>
         <div id="status-stage" class="status-stage"></div>
+        <div id="status-warning" class="status-warning error" hidden></div>
       </div>
       <div class="panel">
         <strong>Avís</strong>
@@ -168,20 +246,60 @@
       // which is easier for staff than waiting on a long request with no feedback.
       const form = document.getElementById("convert-form");
       const fileInput = document.getElementById("file");
+      const pickerSummary = document.getElementById("picker-summary");
+      const selectedFilesList = document.getElementById("selected-files");
       const submitButton = document.getElementById("submit-button");
       const statusPanel = document.getElementById("status-panel");
       const progressBar = document.getElementById("progress-bar");
       const statusPercent = document.getElementById("status-percent");
       const statusMessage = document.getElementById("status-message");
       const statusStage = document.getElementById("status-stage");
+      const statusWarning = document.getElementById("status-warning");
 
       let pollTimer = null;
+      let selectedFiles = [];
+
+      fileInput.addEventListener("click", () => {
+        clearStatusFeedback();
+      });
+
+      fileInput.addEventListener("change", () => {
+        clearStatusFeedback();
+        const incomingFiles = Array.from(fileInput.files);
+        if (!incomingFiles.length) {
+          return;
+        }
+
+        for (const file of incomingFiles) {
+          if (!selectedFiles.some((existingFile) => sameFile(existingFile, file))) {
+            selectedFiles.push(file);
+          }
+        }
+
+        renderSelectedFiles();
+        fileInput.value = "";
+      });
+
+      selectedFilesList.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-remove-index]");
+        if (!button) {
+          return;
+        }
+
+        const index = Number(button.dataset.removeIndex);
+        if (Number.isNaN(index)) {
+          return;
+        }
+
+        selectedFiles.splice(index, 1);
+        renderSelectedFiles();
+      });
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (!fileInput.files.length) {
+        if (!selectedFiles.length) {
           statusPanel.classList.add("visible");
-          statusMessage.textContent = "Selecciona un fitxer abans de començar.";
+          statusMessage.textContent = "Selecciona almenys un fitxer abans de començar.";
           statusMessage.classList.add("error");
           return;
         }
@@ -189,18 +307,26 @@
         clearInterval(pollTimer);
         statusPanel.classList.add("visible");
         statusMessage.classList.remove("error");
-        statusMessage.textContent = "Pujant el fitxer i preparant la conversió.";
+        const selectedCount = selectedFiles.length;
+        statusMessage.textContent = selectedCount === 1
+          ? "Pujant el fitxer i preparant la conversió."
+          : `Pujant ${selectedCount} fitxers i preparant la conversió.`;
         statusStage.textContent = "";
+        statusWarning.hidden = true;
+        statusWarning.innerHTML = "";
         setProgress(0);
         submitButton.disabled = true;
 
-        const formData = new FormData(form);
+        const formData = new FormData();
+        for (const file of selectedFiles) {
+          formData.append("file", file);
+        }
         try {
           const response = await fetch(form.action, {
             method: "POST",
             body: formData,
           });
-          const payload = await response.json();
+          const payload = await parseJsonResponse(response);
           if (!response.ok) {
             throw new Error(payload.error || "No s'ha pogut iniciar la conversió.");
           }
@@ -214,11 +340,13 @@
         }
       });
 
+      renderSelectedFiles();
+
       async function pollStatus(statusUrl, downloadUrl) {
         async function refresh() {
           try {
             const response = await fetch(statusUrl);
-            const payload = await response.json();
+            const payload = await parseJsonResponse(response);
             if (!response.ok) {
               throw new Error(payload.error || "No s'ha pogut consultar l'estat de la conversió.");
             }
@@ -226,14 +354,18 @@
             setProgress(payload.percent || 0);
             statusMessage.textContent = payload.message || "Processant la conversió.";
             statusStage.textContent = stageLabel(payload);
+            renderFailedFiles(payload);
 
             if (payload.status === "success" && payload.download_ready) {
               clearInterval(pollTimer);
               pollTimer = null;
               submitButton.disabled = false;
               setProgress(100);
+              fadeOutSelectedFiles();
               // Trigger the browser download as soon as the backend marks the artifact ready.
-              window.location.href = downloadUrl;
+              window.setTimeout(() => {
+                window.location.href = downloadUrl;
+              }, 180);
               return;
             }
 
@@ -244,6 +376,7 @@
               statusMessage.textContent = payload.public_error_message || "La conversió ha fallat.";
               statusMessage.classList.add("error");
               statusStage.textContent = "";
+              renderFailedFiles(payload);
             }
           } catch (error) {
             clearInterval(pollTimer);
@@ -251,6 +384,8 @@
             submitButton.disabled = false;
             statusMessage.textContent = error.message;
             statusMessage.classList.add("error");
+            statusWarning.hidden = true;
+            statusWarning.innerHTML = "";
           }
         }
 
@@ -267,7 +402,9 @@
       function stageLabel(payload) {
         // Translate backend stage ids into friendly status text for the public UI.
         if (payload.status === "success") {
-          return "Descàrrega preparada.";
+          return payload.metadata?.failed_file_count
+            ? "Descàrrega preparada amb avisos."
+            : "Descàrrega preparada.";
         }
         if (payload.stage === "extracting") {
           return "Descomprimint el fitxer.";
@@ -285,6 +422,102 @@
           return "S'ha produït un error.";
         }
         return "";
+      }
+
+      function renderFailedFiles(payload) {
+        const failedFiles = payload.metadata?.failed_files || [];
+        if (!failedFiles.length) {
+          statusWarning.hidden = true;
+          statusWarning.innerHTML = "";
+          return;
+        }
+
+        const hasSuccessfulFiles = (payload.metadata?.successful_file_count || 0) > 0;
+        const intro = failedFiles.length === 1
+          ? "Ep! No hem pogut convertir aquest fitxer:"
+          : "Ep! No hem pogut convertir aquests fitxers:";
+        const explanation = failedFiles.length === 1
+          ? "Hi ha hagut un problema durant el procés. Pot ser un error temporal nostre o bé que el fitxer pujat no sigui una acta d'Esfer@. Si és el cas, prova-ho amb un altre fitxer."
+          : "Hi ha hagut un problema durant el procés. Pot ser un error temporal nostre o bé que els fitxers pujats no siguin actes d'Esfer@. Si és el cas, prova-ho amb altres fitxers.";
+        const suffix = hasSuccessfulFiles
+          ? "La resta d'arxius han estat correctament convertits."
+          : "No s'ha pogut convertir cap dels arxius seleccionats.";
+
+        const bulletList = failedFiles
+          .map((file) => `<li>${escapeHtml(file.source_name)}</li>`)
+          .join("");
+        statusWarning.innerHTML = `
+          <div>${intro}</div>
+          <ul>${bulletList}</ul>
+          <div>${explanation} ${escapeHtml(suffix)}</div>
+        `;
+        statusWarning.hidden = false;
+      }
+
+      function clearStatusFeedback() {
+        statusPanel.classList.remove("visible");
+        statusMessage.classList.remove("error");
+        statusMessage.textContent = "Esperant per començar.";
+        statusStage.textContent = "";
+        statusWarning.hidden = true;
+        statusWarning.innerHTML = "";
+        setProgress(0);
+      }
+
+      function renderSelectedFiles() {
+        pickerSummary.textContent = selectedFiles.length === 0
+          ? "Cap fitxer seleccionat."
+          : `${selectedFiles.length} fitxer(s) preparat(s) per pujar.`;
+
+        if (!selectedFiles.length) {
+          selectedFilesList.hidden = true;
+          selectedFilesList.innerHTML = "";
+          return;
+        }
+
+        selectedFilesList.hidden = false;
+        selectedFilesList.innerHTML = selectedFiles.map((file, index) => `
+          <li class="selected-file">
+            <span class="selected-file-name">${escapeHtml(file.name)}</span>
+            <button type="button" class="remove-file" data-remove-index="${index}">Elimina</button>
+          </li>
+        `).join("");
+      }
+
+      function sameFile(left, right) {
+        return left.name === right.name && left.size === right.size && left.lastModified === right.lastModified;
+      }
+
+      async function parseJsonResponse(response) {
+        const rawText = await response.text();
+        try {
+          return rawText ? JSON.parse(rawText) : {};
+        } catch (error) {
+          throw new Error("El servidor ha retornat una resposta no vàlida.");
+        }
+      }
+
+      function escapeHtml(value) {
+        return value
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll("\"", "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function fadeOutSelectedFiles() {
+        if (!selectedFiles.length || selectedFilesList.hidden) {
+          return;
+        }
+
+        selectedFilesList.classList.add("fading-out");
+        window.setTimeout(() => {
+          selectedFiles = [];
+          fileInput.value = "";
+          renderSelectedFiles();
+          selectedFilesList.classList.remove("fading-out");
+        }, 220);
       }
     </script>
   </body>

@@ -8,6 +8,7 @@ import tempfile
 import threading
 import traceback
 import uuid
+import zipfile
 from datetime import datetime, timezone
 from functools import wraps
 from io import BytesIO
@@ -26,6 +27,7 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug.exceptions import HTTPException
 from rich.console import Console
 from rich.traceback import Traceback
 from werkzeug.utils import secure_filename
@@ -70,6 +72,22 @@ def create_app() -> Flask:
     @app.get("/health")
     def health():
         return {"status": "ok"}
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(error: HTTPException):
+        if request.path.startswith("/convert"):
+            response = jsonify({"error": error.description or error.name})
+            response.status_code = error.code or 500
+            return response
+        return error
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_exception(error: Exception):
+        if request.path.startswith("/convert"):
+            response = jsonify({"error": "S'ha produït un error inesperat."})
+            response.status_code = 500
+            return response
+        raise error
 
     @app.route("/admin/login", methods=["GET", "POST"])
     def admin_login():
@@ -156,23 +174,44 @@ def create_app() -> Flask:
 
     @app.post("/convert")
     def convert():
-        uploaded_file = request.files.get("file")
-        if uploaded_file is None or uploaded_file.filename is None or not uploaded_file.filename.strip():
-            abort(400, "Cal carregar un fitxer PDF o ZIP.")
-
         job_id = uuid.uuid4().hex
-        source_name = secure_filename(uploaded_file.filename) or f"upload-{job_id}"
-        source_ext = Path(source_name).suffix.lower()
-        if source_ext not in {".pdf", ".zip"}:
-            abort(400, "Només s'admeten fitxers PDF i ZIP.")
+        uploaded_files = [
+            uploaded_file
+            for uploaded_file in request.files.getlist("file")
+            if uploaded_file is not None and uploaded_file.filename and uploaded_file.filename.strip()
+        ]
+        if not uploaded_files:
+            abort(400, "Cal carregar almenys un fitxer PDF o ZIP.")
 
-        request_type = "zip" if source_ext == ".zip" else "pdf"
+        source_names = [secure_filename(uploaded_file.filename) or f"upload-{job_id}" for uploaded_file in uploaded_files]
+        source_exts = [Path(source_name).suffix.lower() for source_name in source_names]
+        if any(source_ext not in {".pdf", ".zip"} for source_ext in source_exts):
+            abort(400, "Només s'admeten fitxers PDF i ZIP.")
+        if len(uploaded_files) > 1 and any(source_ext == ".zip" for source_ext in source_exts):
+            abort(400, "Si carregues diversos fitxers alhora, tots han de ser PDF.")
+
+        if len(uploaded_files) == 1:
+            source_name = source_names[0]
+            request_type = "zip" if source_exts[0] == ".zip" else "pdf"
+        else:
+            source_name = "selected_files-converted.zip"
+            request_type = "pdf_batch"
+
         work_dir = Path(tempfile.mkdtemp(prefix=f"esfera-job-{job_id}-", dir=app.config["UPLOAD_ROOT"]))
         extracted_dir: Path | None = None
         upload_path = work_dir / source_name
-        uploaded_file.save(upload_path)
+        if request_type == "pdf_batch":
+            with zipfile.ZipFile(upload_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive_names: set[str] = set()
+                for uploaded_file, uploaded_name in zip(uploaded_files, source_names):
+                    archive_name = _dedupe_uploaded_name(uploaded_name, archive_names)
+                    archive_names.add(archive_name)
+                    with archive.open(archive_name, "w") as destination:
+                        shutil.copyfileobj(uploaded_file.stream, destination)
+        else:
+            uploaded_files[0].save(upload_path)
         source_size_bytes = upload_path.stat().st_size
-        source_file_count = 1
+        source_file_count = len(uploaded_files)
 
         app.audit_store.create_job(
             job_id=job_id,
@@ -324,6 +363,7 @@ def _run_conversion_job(
     """
     extracted_dir: Path | None = None
     source_file_count = 1
+    failed_files: list[dict[str, str]] = []
     app.audit_store.mark_started(job_id)
     try:
         output_dir = work_dir / "output"
@@ -361,10 +401,11 @@ def _run_conversion_job(
             )
             return
 
+        extraction_message = "Descomprimint els fitxers PDF seleccionats" if request_type == "pdf_batch" else "Descomprimint el fitxer"
         app.audit_store.update_progress(
             job_id,
             stage="extracting",
-            message="Descomprimint el fitxer",
+            message=extraction_message,
             progress_current=0,
             progress_total=1,
             metadata={"work_dir": str(work_dir)},
@@ -408,7 +449,21 @@ def _run_conversion_job(
                     status="error",
                     error_message=str(file_exc),
                 )
-                raise RuntimeError(f"Failed to convert {pdf_path.name}: {file_exc}") from file_exc
+                failed_files.append(
+                    {
+                        "source_name": pdf_path.name,
+                        "error_message": _public_file_error_message(file_exc),
+                    }
+                )
+
+        if not artifacts:
+            failed_names = ", ".join(file_result["source_name"] for file_result in failed_files[:3])
+            if len(failed_files) > 3:
+                failed_names = f"{failed_names}, ..."
+            raise RuntimeError(
+                "No s'ha pogut convertir cap fitxer del lot."
+                + (f" Fitxers amb error: {failed_names}." if failed_names else "")
+            )
 
         app.audit_store.update_progress(
             job_id,
@@ -421,13 +476,25 @@ def _run_conversion_job(
         zip_path = build_zip_from_artifacts(artifacts, work_dir / f"{Path(source_name).stem}-converted.zip")
         if extracted_dir is not None:
             cleanup_path(extracted_dir)
+        ready_message = "Conversió completada. Preparant la descàrrega."
+        if failed_files:
+            ready_message = (
+                f"Conversió parcial completada: {len(artifacts)} fitxer(s) convertit(s) "
+                f"i {len(failed_files)} amb error."
+            )
         app.audit_store.update_progress(
             job_id,
             stage="ready",
-            message="Conversió completada. Preparant la descàrrega.",
+            message=ready_message,
             progress_current=source_file_count + 1,
             progress_total=source_file_count + 1,
-            metadata={"work_dir": str(work_dir), "output_path": str(zip_path)},
+            metadata={
+                "work_dir": str(work_dir),
+                "output_path": str(zip_path),
+                "failed_files": failed_files,
+                "failed_file_count": len(failed_files),
+                "successful_file_count": len(artifacts),
+            },
         )
         app.audit_store.mark_success(
             job_id,
@@ -471,6 +538,9 @@ def _run_conversion_job(
                 **existing_metadata,
                 "source_file_count": source_file_count,
                 "work_dir": str(work_dir),
+                "failed_files": failed_files,
+                "failed_file_count": len(failed_files),
+                "successful_file_count": 0,
                 "failed_source_path": str(failed_source_path) if failed_source_path else None,
                 "failure_log_path": str(failure_log_path),
             },
@@ -611,6 +681,35 @@ def _write_failure_log(
         )
     log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return log_path
+
+
+def _dedupe_uploaded_name(name: str, existing_names: set[str]) -> str:
+    """Keep uploaded archive members unique when users select duplicate filenames."""
+    candidate = name
+    stem = Path(name).stem
+    suffix = Path(name).suffix
+    counter = 1
+    while candidate in existing_names:
+        candidate = f"{stem}-{counter}{suffix}"
+        counter += 1
+    return candidate
+
+
+def _public_file_error_message(error: Exception) -> str:
+    """Translate low-level conversion exceptions into user-facing Catalan messages."""
+    error_text = str(error).strip()
+    lowered = error_text.lower()
+
+    if "expected string or bytes-like object" in lowered:
+        return "El fitxer no té l'estructura esperada d'una acta d'Esfer@."
+    if "no objects to concatenate" in lowered:
+        return "No s'han pogut extreure les taules necessàries del PDF."
+    if "list index out of range" in lowered:
+        return "No s'ha pogut llegir correctament la primera pàgina del PDF."
+    if "the zip file does not contain any pdf files" in lowered:
+        return "El fitxer comprimit no conté cap PDF vàlid."
+
+    return "No s'ha pogut convertir aquest fitxer perquè no té el format esperat o hi ha hagut un error durant el procés."
 
 
 app = create_app()
