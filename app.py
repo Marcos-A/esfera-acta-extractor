@@ -737,10 +737,7 @@ def _build_partial_failure_notification_body(
     failed_count = len(failed_files)
     failed_label = "fitxer amb error" if failed_count == 1 else "fitxers amb error"
     successful_label = "fitxer convertit correctament" if successful_count == 1 else "fitxers convertits correctament"
-    failed_lines = "\n".join(
-        f"- {file_result['source_name']}: {file_result['error_message']}"
-        for file_result in failed_files
-    )
+    failed_lines = _format_failed_file_details(failed_files)
     return (
         "Hi ha hagut una conversio parcial amb incidencies.\n\n"
         f"Job ID: {job_id}\n"
@@ -778,10 +775,7 @@ def _build_failure_notification(
     failed_count = len(failed_files)
     failed_label = "fitxer amb error" if failed_count == 1 else "fitxers amb error"
     if failed_files:
-        failed_lines = "\n".join(
-            f"- {file_result['source_name']}: {file_result['error_message']}"
-            for file_result in failed_files
-        )
+        failed_lines = _format_failed_file_details(failed_files)
         details_block = f"Fitxers amb error:\n{failed_lines}\n"
     else:
         details_block = ""
@@ -798,6 +792,25 @@ def _build_failure_notification(
             f"{details_block}"
             f"Debug path: {debug_path}\n"
         ),
+    )
+
+
+def _format_failed_file_details(failed_files: list[dict[str, str]]) -> str:
+    """Render failed file details with a compact plural form for repeated structure errors."""
+    structure_error_message = "El fitxer no té l'estructura esperada d'una acta d'Esfer@."
+    if (
+        len(failed_files) > 1
+        and all(file_result["error_message"] == structure_error_message for file_result in failed_files)
+    ):
+        file_list = "\n".join(f"- {file_result['source_name']}" for file_result in failed_files)
+        return (
+            f"{file_list}\n"
+            "Els fitxers no tenen l'estructura esperada d'un acta d'Esfer@."
+        )
+
+    return "\n".join(
+        f"- {file_result['source_name']}: {file_result['error_message']}"
+        for file_result in failed_files
     )
 
 
