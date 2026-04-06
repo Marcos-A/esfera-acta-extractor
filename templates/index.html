@@ -258,12 +258,19 @@
 
       let pollTimer = null;
       let selectedFiles = [];
+      let shouldResetSelectionOnNextPick = false;
 
       fileInput.addEventListener("click", () => {
+        if (shouldResetSelectionOnNextPick) {
+          resetSelectionState();
+        }
         clearStatusFeedback();
       });
 
       fileInput.addEventListener("change", () => {
+        if (shouldResetSelectionOnNextPick) {
+          resetSelectionState();
+        }
         clearStatusFeedback();
         const incomingFiles = Array.from(fileInput.files);
         if (!incomingFiles.length) {
@@ -316,6 +323,7 @@
         statusWarning.innerHTML = "";
         setProgress(0);
         submitButton.disabled = true;
+        shouldResetSelectionOnNextPick = false;
 
         const formData = new FormData();
         for (const file of selectedFiles) {
@@ -361,6 +369,7 @@
               pollTimer = null;
               submitButton.disabled = false;
               setProgress(100);
+              shouldResetSelectionOnNextPick = true;
               fadeOutSelectedFiles();
               // Trigger the browser download as soon as the backend marks the artifact ready.
               window.setTimeout(() => {
@@ -377,6 +386,7 @@
               statusMessage.classList.add("error");
               statusStage.textContent = "";
               renderFailedFiles(payload);
+              shouldResetSelectionOnNextPick = true;
             }
           } catch (error) {
             clearInterval(pollTimer);
@@ -518,6 +528,13 @@
           renderSelectedFiles();
           selectedFilesList.classList.remove("fading-out");
         }, 220);
+      }
+
+      function resetSelectionState() {
+        selectedFiles = [];
+        fileInput.value = "";
+        renderSelectedFiles();
+        shouldResetSelectionOnNextPick = false;
       }
     </script>
   </body>
