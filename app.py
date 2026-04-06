@@ -556,15 +556,17 @@ def _run_conversion_job(
                 "failure_log_path": str(failure_log_path),
             },
         )
+        full_failure_subject, full_failure_body = _build_failure_notification(
+            job_id=job_id,
+            source_name=source_name,
+            request_type=request_type,
+            error_message=str(exc),
+            debug_path=debug_path,
+            failed_files=failed_files,
+        )
         notify_failure(
-            subject=f"[esfera-acta-extractor] Conversion failed for {source_name}",
-            body=(
-                f"Job ID: {job_id}\n"
-                f"Source: {source_name}\n"
-                f"Type: {request_type}\n"
-                f"Error: {exc}\n"
-                f"Debug path: {debug_path}\n"
-            ),
+            subject=full_failure_subject,
+            body=full_failure_body,
         )
         if extracted_dir is not None:
             cleanup_path(extracted_dir)
@@ -731,18 +733,71 @@ def _build_partial_failure_notification_body(
     successful_count: int,
     failed_files: list[dict[str, str]],
 ) -> str:
-    """Format a compact alert body when only part of a batch conversion fails."""
+    """Format a Catalan alert body when only part of a batch conversion fails."""
+    failed_count = len(failed_files)
+    failed_label = "fitxer amb error" if failed_count == 1 else "fitxers amb error"
+    successful_label = "fitxer convertit correctament" if successful_count == 1 else "fitxers convertits correctament"
     failed_lines = "\n".join(
         f"- {file_result['source_name']}: {file_result['error_message']}"
         for file_result in failed_files
     )
     return (
+        "Hi ha hagut una conversio parcial amb incidencies.\n\n"
         f"Job ID: {job_id}\n"
-        f"Source: {source_name}\n"
-        f"Type: {request_type}\n"
-        f"Successful files: {successful_count}\n"
-        f"Failed files: {len(failed_files)}\n"
-        f"Failed file details:\n{failed_lines}\n"
+        f"Lot: {source_name}\n"
+        f"Tipus de peticio: {request_type}\n"
+        f"Resultat: {successful_count} {successful_label} i {failed_count} {failed_label}.\n"
+        "Fitxers amb error:\n"
+        f"{failed_lines}\n"
+    )
+
+
+def _build_failure_notification(
+    *,
+    job_id: str,
+    source_name: str,
+    request_type: str,
+    error_message: str,
+    debug_path: Path,
+    failed_files: list[dict[str, str]],
+) -> tuple[str, str]:
+    """Format a full-failure alert with singular/plural-aware Catalan copy."""
+    if request_type == "pdf":
+        return (
+            f"[esfera-acta-extractor] Conversion failed for {source_name}",
+            (
+                "Ha fallat la conversio d'un fitxer.\n\n"
+                f"Job ID: {job_id}\n"
+                f"Fitxer: {source_name}\n"
+                f"Tipus de peticio: {request_type}\n"
+                f"Error principal: {error_message}\n"
+                f"Debug path: {debug_path}\n"
+            ),
+        )
+
+    failed_count = len(failed_files)
+    failed_label = "fitxer amb error" if failed_count == 1 else "fitxers amb error"
+    if failed_files:
+        failed_lines = "\n".join(
+            f"- {file_result['source_name']}: {file_result['error_message']}"
+            for file_result in failed_files
+        )
+        details_block = f"Fitxers amb error:\n{failed_lines}\n"
+    else:
+        details_block = ""
+
+    return (
+        f"[esfera-acta-extractor] Batch conversion failed for {source_name}",
+        (
+            "Ha fallat la conversio completa d'un lot.\n\n"
+            f"Job ID: {job_id}\n"
+            f"Lot: {source_name}\n"
+            f"Tipus de peticio: {request_type}\n"
+            f"Resultat: 0 fitxers convertits correctament i {failed_count} {failed_label}.\n"
+            f"Error principal: {error_message}\n"
+            f"{details_block}"
+            f"Debug path: {debug_path}\n"
+        ),
     )
 
 
