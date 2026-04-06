@@ -364,6 +364,7 @@ def _run_conversion_job(
     extracted_dir: Path | None = None
     source_file_count = 1
     failed_files: list[dict[str, str]] = []
+    partial_debug_path: Path | None = None
     app.audit_store.mark_started(job_id)
     try:
         output_dir = work_dir / "output"
@@ -502,14 +503,30 @@ def _run_conversion_job(
             returned_file_count=len(artifacts),
         )
         if failed_files:
+            partial_debug_path = _retain_failed_job(app.config["FAILURE_ROOT"], job_id, source_name, upload_path, work_dir)
+            current_job = app.audit_store.get_job(job_id)
+            existing_metadata = _load_metadata((current_job or {}).get("metadata_json"))
+            app.audit_store.update_job_artifact_metadata(
+                job_id,
+                debug_path=str(partial_debug_path),
+                metadata={
+                    **existing_metadata,
+                    "work_dir": str(work_dir),
+                    "output_path": str(zip_path),
+                    "failed_files": failed_files,
+                    "failed_file_count": len(failed_files),
+                    "successful_file_count": len(artifacts),
+                    "partial_failure_debug_path": str(partial_debug_path),
+                },
+            )
             notify_failure(
                 subject=f"[esfera-acta-extractor] Partial conversion failure for {source_name}",
                 body=_build_partial_failure_notification_body(
                     job_id=job_id,
-                    source_name=source_name,
                     request_type=request_type,
                     successful_count=len(artifacts),
                     failed_files=failed_files,
+                    debug_path=partial_debug_path,
                 ),
             )
     except Exception as exc:
@@ -728,20 +745,19 @@ def _public_file_error_message(error: Exception) -> str:
 def _build_partial_failure_notification_body(
     *,
     job_id: str,
-    source_name: str,
     request_type: str,
     successful_count: int,
     failed_files: list[dict[str, str]],
+    debug_path: Path,
 ) -> str:
     """Format a Catalan alert body when only part of a batch conversion fails."""
     failed_count = len(failed_files)
     failed_label = "fitxer amb error" if failed_count == 1 else "fitxers amb error"
     successful_label = "fitxer convertit correctament" if successful_count == 1 else "fitxers convertits correctament"
-    failed_lines = _format_failed_file_details(failed_files)
+    failed_lines = _format_failed_file_blocks(failed_files, debug_path)
     return (
         "Hi ha hagut una conversio parcial amb incidencies.\n\n"
         f"Job ID: {job_id}\n"
-        f"Lot: {source_name}\n"
         f"Tipus de peticio: {request_type}\n"
         f"Resultat: {successful_count} {successful_label} i {failed_count} {failed_label}.\n"
         "Fitxers amb error:\n"
@@ -765,8 +781,8 @@ def _build_failure_notification(
             (
                 "Ha fallat la conversio d'un fitxer.\n\n"
                 f"Job ID: {job_id}\n"
-                f"Fitxer: {source_name}\n"
                 f"Tipus de peticio: {request_type}\n"
+                f"Fitxer: {source_name}\n"
                 f"Error principal: {error_message}\n"
                 f"Debug path: {debug_path}\n"
             ),
@@ -775,7 +791,7 @@ def _build_failure_notification(
     failed_count = len(failed_files)
     failed_label = "fitxer amb error" if failed_count == 1 else "fitxers amb error"
     if failed_files:
-        failed_lines = _format_failed_file_details(failed_files)
+        failed_lines = _format_failed_file_blocks(failed_files, debug_path)
         details_block = f"Fitxers amb error:\n{failed_lines}\n"
     else:
         details_block = ""
@@ -785,31 +801,24 @@ def _build_failure_notification(
         (
             "Ha fallat la conversio completa d'un lot.\n\n"
             f"Job ID: {job_id}\n"
-            f"Lot: {source_name}\n"
             f"Tipus de peticio: {request_type}\n"
             f"Resultat: 0 fitxers convertits correctament i {failed_count} {failed_label}.\n"
             f"Error principal: {error_message}\n"
             f"{details_block}"
-            f"Debug path: {debug_path}\n"
         ),
     )
 
 
-def _format_failed_file_details(failed_files: list[dict[str, str]]) -> str:
-    """Render failed file details with a compact plural form for repeated structure errors."""
-    structure_error_message = "El fitxer no té l'estructura esperada d'una acta d'Esfer@."
-    if (
-        len(failed_files) > 1
-        and all(file_result["error_message"] == structure_error_message for file_result in failed_files)
-    ):
-        file_list = "\n".join(f"- {file_result['source_name']}" for file_result in failed_files)
-        return (
-            f"{file_list}\n"
-            "Els fitxers no tenen l'estructura esperada d'un acta d'Esfer@."
+def _format_failed_file_blocks(failed_files: list[dict[str, str]], debug_path: Path) -> str:
+    """Render failed file details as repeated file/error/debug blocks for Telegram alerts."""
+    return "\n\n".join(
+        "\n".join(
+            [
+                f"- Fitxer: {file_result['source_name']}",
+                f"  Error principal: {file_result['error_message']}",
+                f"  Debug path: {debug_path}",
+            ]
         )
-
-    return "\n".join(
-        f"- {file_result['source_name']}: {file_result['error_message']}"
         for file_result in failed_files
     )
 
