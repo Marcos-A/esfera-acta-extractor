@@ -501,6 +501,17 @@ def _run_conversion_job(
             returned_name=zip_path.name,
             returned_file_count=len(artifacts),
         )
+        if failed_files:
+            notify_failure(
+                subject=f"[esfera-acta-extractor] Partial conversion failure for {source_name}",
+                body=_build_partial_failure_notification_body(
+                    job_id=job_id,
+                    source_name=source_name,
+                    request_type=request_type,
+                    successful_count=len(artifacts),
+                    failed_files=failed_files,
+                ),
+            )
     except Exception as exc:
         debug_path = _retain_failed_job(app.config["FAILURE_ROOT"], job_id, source_name, upload_path, work_dir)
         current_job = app.audit_store.get_job(job_id)
@@ -710,6 +721,29 @@ def _public_file_error_message(error: Exception) -> str:
         return "El fitxer comprimit no conté cap PDF vàlid."
 
     return "No s'ha pogut convertir aquest fitxer perquè no té el format esperat o hi ha hagut un error durant el procés."
+
+
+def _build_partial_failure_notification_body(
+    *,
+    job_id: str,
+    source_name: str,
+    request_type: str,
+    successful_count: int,
+    failed_files: list[dict[str, str]],
+) -> str:
+    """Format a compact alert body when only part of a batch conversion fails."""
+    failed_lines = "\n".join(
+        f"- {file_result['source_name']}: {file_result['error_message']}"
+        for file_result in failed_files
+    )
+    return (
+        f"Job ID: {job_id}\n"
+        f"Source: {source_name}\n"
+        f"Type: {request_type}\n"
+        f"Successful files: {successful_count}\n"
+        f"Failed files: {len(failed_files)}\n"
+        f"Failed file details:\n{failed_lines}\n"
+    )
 
 
 app = create_app()
