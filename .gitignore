@@ -68,6 +68,7 @@ windsurf.local.jsonc
 
 # Local runtime secrets and helper scripts
 .env.local
+.env.prod
 run-local-web.sh
 
 # Runtime application state
