@@ -14,6 +14,7 @@ The beta instance is designed to stay isolated from production by using:
 - a separate upload temp root
 - separate admin credentials
 - performance instrumentation enabled only in beta
+- alerts disabled by default so beta failures do not notify production channels
 
 ## Proposed Beta Instance Settings
 
@@ -40,6 +41,25 @@ Use these names and paths unless your host already reserves them:
 - `Caddyfile.esfera2excel-perf.example`
 
 No Docker Compose file is included because the current project deployment is documented as a direct `docker run` flow rather than Compose.
+
+## Alerting Behavior In Beta
+
+Beta alerting is intentionally disabled by default.
+
+In `.env.perf.example`, these are left blank on purpose:
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
+- `ALERT_WEBHOOK_URL`
+
+When those values are blank, `src/notifier.py` intentionally skips notification delivery.
+This keeps beta failures from sending Telegram alerts to production channels during test runs.
+
+If you ever want alerting in beta, point it at a dedicated non-production destination first.
 
 ## Deploy Commands
 
