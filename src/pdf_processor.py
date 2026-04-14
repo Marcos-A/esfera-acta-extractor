@@ -2,6 +2,8 @@
 PDF processing module for extracting and processing tables from Esfer@ grade reports.
 """
 
+from __future__ import annotations
+
 import pdfplumber
 import pandas as pd
 
@@ -20,15 +22,7 @@ def extract_tables(pdf_path: str, table_opts: dict = None) -> list[pd.DataFrame]
             "snap_tolerance": 3
         }
 
-    tables: list[pd.DataFrame] = []
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            raw = page.extract_table(table_opts)
-            if not raw:
-                continue
-            headers, *rows = raw
-            tables.append(pd.DataFrame(rows, columns=headers))
-
+    _group_code, tables = extract_group_code_and_tables(pdf_path, table_opts)
     return tables
 
 
@@ -37,18 +31,50 @@ def extract_group_code(pdf_path: str) -> str:
     Extract the group code that appears under 'Codi del grup' in the first page.
     Returns the code with underscores instead of spaces.
     """
+    group_code, _tables = extract_group_code_and_tables(pdf_path)
+    return group_code
+
+
+def extract_group_code_and_tables(
+    pdf_path: str,
+    table_opts: dict | None = None,
+) -> tuple[str, list[pd.DataFrame]]:
+    """
+    Extract the group code and all tables in one PDF pass.
+
+    The conversion pipeline needs both the first-page metadata and the page tables, so
+    opening the PDF only once avoids duplicate parsing work.
+    """
+    if table_opts is None:
+        table_opts = {
+            "vertical_strategy": "lines",
+            "horizontal_strategy": "lines",
+            "snap_tolerance": 3
+        }
+
+    tables: list[pd.DataFrame] = []
+    group_code = 'unknown_group'
+
     with pdfplumber.open(pdf_path) as pdf:
-        first_page = pdf.pages[0]
-        text = first_page.extract_text()
-        
-        # In the current report layout the actual group code is printed on the next line,
-        # so we read line-by-line instead of relying on a more fragile page-wide regex.
-        # Find the line after "Codi del grup"
-        lines = text.split('\n')
-        for i, line in enumerate(lines):
-            if 'Codi del grup' in line and i + 1 < len(lines):
-                # Extract the code from the next line and replace spaces with underscores
-                group_code = lines[i + 1].strip()
-                return group_code.replace(' ', '_')
-    
-    return 'unknown_group'  # Fallback keeps conversion running even if naming metadata is missing.
+        if pdf.pages:
+            first_page_text = pdf.pages[0].extract_text() or ""
+            group_code = _extract_group_code_from_text(first_page_text)
+
+        for page in pdf.pages:
+            raw = page.extract_table(table_opts)
+            if not raw:
+                continue
+            headers, *rows = raw
+            tables.append(pd.DataFrame(rows, columns=headers))
+
+    return group_code, tables
+
+
+def _extract_group_code_from_text(text: str) -> str:
+    """Extract the group code from the first-page text block."""
+    lines = text.split('\n')
+    for index, line in enumerate(lines):
+        if 'Codi del grup' in line and index + 1 < len(lines):
+            group_code = lines[index + 1].strip()
+            return group_code.replace(' ', '_')
+    return 'unknown_group'

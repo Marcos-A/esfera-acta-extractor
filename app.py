@@ -201,7 +201,7 @@ def create_app() -> Flask:
         extracted_dir: Path | None = None
         upload_path = work_dir / source_name
         if request_type == "pdf_batch":
-            with zipfile.ZipFile(upload_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            with zipfile.ZipFile(upload_path, "w", compression=zipfile.ZIP_STORED) as archive:
                 archive_names: set[str] = set()
                 for uploaded_file, uploaded_name in zip(uploaded_files, source_names):
                     archive_name = _dedupe_uploaded_name(uploaded_name, archive_names)
