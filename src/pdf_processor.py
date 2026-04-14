@@ -2,6 +2,8 @@
 PDF processing module for extracting and processing tables from Esfer@ grade reports.
 """
 
+from __future__ import annotations
+
 import pdfplumber
 import pandas as pd
 
