@@ -29,7 +29,7 @@ from .grade_processor import (
     find_mp_codes_with_em,
     sort_records,
 )
-from .pdf_processor import extract_group_code, extract_tables
+from .pdf_processor import extract_group_code_and_tables
 
 
 @dataclass
@@ -60,12 +60,9 @@ def convert_pdf_to_excel(
     output_dir.mkdir(parents=True, exist_ok=True)
     timings = TimingRecorder("convert_pdf_to_excel")
 
-    with timings.measure("extract_group_code"):
-        group_code = extract_group_code(str(pdf_path))
+    with timings.measure("extract_pdf_contents"):
+        group_code, tables = extract_group_code_and_tables(str(pdf_path))
         output_xlsx = output_dir / f"{group_code}.xlsx"
-
-    with timings.measure("extract_tables"):
-        tables = extract_tables(str(pdf_path))
 
     with timings.measure("shape_pdf_tables"):
         combined = pd.concat(tables, ignore_index=True)

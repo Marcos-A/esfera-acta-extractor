@@ -19,8 +19,13 @@ def extract_records(
     - Other grades (PDT, EP, NA, etc.) are kept as strings
     """
     rows = []
-    for _, row in melted.iterrows():
-        for code, grade in entry_pattern.findall(row['entry']):
+    name_col_index = melted.columns.get_loc(name_col)
+    entry_index = melted.columns.get_loc('entry')
+
+    for row in melted.itertuples(index=False, name=None):
+        student_name = row[name_col_index]
+        entry_value = row[entry_index]
+        for code, grade in entry_pattern.findall(entry_value):
             # Normalize whitespace in code
             code = re.sub(r"\s+", "", code)
             # Keep numeric grades numeric so Excel formulas and sorting behave naturally.
@@ -34,7 +39,7 @@ def extract_records(
                 # 'PDT', 'EP', 'NA', etc.
                 grade_val = grade        
             rows.append({
-                'estudiant': row[name_col],
+                'estudiant': student_name,
                 'code': code,
                 'grade': grade_val
             })
@@ -72,6 +77,7 @@ def find_mp_codes_with_em(melted: pd.DataFrame, mp_codes: list[str]) -> list[str
     )
     
     mp_with_em = set()
+    mp_code_set = set(mp_codes)
     mp_pattern = re.compile(r'^([A-Za-z0-9]+)_')
     
     # Stop early once every known MP has been matched. This keeps large ZIP batches fast.
@@ -86,7 +92,7 @@ def find_mp_codes_with_em(melted: pd.DataFrame, mp_codes: list[str]) -> list[str
             mp_match = mp_pattern.match(code_no_space)
             if mp_match:
                 mp_code = mp_match.group(1)
-                if mp_code in mp_codes:
+                if mp_code in mp_code_set:
                     mp_with_em.add(mp_code)
                     
         # If we've found EM entries for all MP codes, we can stop

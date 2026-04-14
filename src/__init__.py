@@ -5,7 +5,7 @@ Keeping the main helpers here makes both the CLI script and any future integrati
 import from a single stable location.
 """
 
-from .pdf_processor import extract_tables, extract_group_code
+from .pdf_processor import extract_tables, extract_group_code, extract_group_code_and_tables
 from .data_processor import (
     normalize_headers,
     drop_irrelevant_columns,
@@ -32,6 +32,7 @@ from .conversion_service import (
 __all__ = [
     'extract_tables',
     'extract_group_code',
+    'extract_group_code_and_tables',
     'normalize_headers',
     'drop_irrelevant_columns',
     'forward_fill_names',
