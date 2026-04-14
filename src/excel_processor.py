@@ -9,6 +9,8 @@ from openpyxl.styles import PatternFill, Font, Border, Side, Alignment
 from openpyxl.formatting.rule import FormulaRule
 from typing import Optional
 
+from .perf_timing import TimingRecorder
+
 
 def apply_row_formatting(
     workbook_path: str,
@@ -251,66 +253,70 @@ def export_excel_with_spacing(
     Export DataFrame to Excel with specific column spacing after each MP's RAs.
     Adds a "#" column with sequential numbers at the beginning.
     """
+    timings = TimingRecorder("export_excel_with_spacing")
     # MP grade columns are renamed to the short MP code, while detailed RA/EM columns
     # keep their full identifier so the final workbook remains understandable.
-    non_mp_columns = [col for col in df.columns
-                         if col.endswith(('EM', 'RA')) or col == 'estudiant']
-    df = df.rename(columns=lambda col: col.split('_')[0] if col not in non_mp_columns else col)
-    mp_grade_columns = [col for col in df.columns if not col.endswith('EM') and
-                         not col.endswith('RA') and col != 'estudiant']
-    df_without_mp_grades = df[non_mp_columns].copy()
+    with timings.measure("prepare_export_dataframe"):
+        non_mp_columns = [col for col in df.columns
+                             if col.endswith(('EM', 'RA')) or col == 'estudiant']
+        df = df.rename(columns=lambda col: col.split('_')[0] if col not in non_mp_columns else col)
+        mp_grade_columns = [col for col in df.columns if not col.endswith('EM') and
+                             not col.endswith('RA') and col != 'estudiant']
+        df_without_mp_grades = df[non_mp_columns].copy()
 
-    ra_codes = [col for col in df_without_mp_grades.columns if col != 'estudiant']
+        ra_codes = [col for col in df_without_mp_grades.columns if col != 'estudiant']
 
-    mp_groups = {mp: [] for mp in mp_codes}
-    sorted_mp_codes = sorted(mp_codes, key=len, reverse=True)
-    for ra_code in ra_codes:
-        for mp_code in sorted_mp_codes:
-            if ra_code.startswith(mp_code + '_'):
-                mp_groups[mp_code].append(ra_code)
-                break
+        mp_groups = {mp: [] for mp in mp_codes}
+        sorted_mp_codes = sorted(mp_codes, key=len, reverse=True)
+        for ra_code in ra_codes:
+            for mp_code in sorted_mp_codes:
+                if ra_code.startswith(mp_code + '_'):
+                    mp_groups[mp_code].append(ra_code)
+                    break
 
-    new_columns = ['estudiant']
-    for mp_code in mp_codes:
-        for ra in mp_groups[mp_code]:
-            new_columns.append(ra)
-        if mp_code in mp_codes_with_em:
-            new_columns.extend([
-                f'{mp_code} CENTRE',
-                f'{mp_code} EMPRESA',
-                f'{mp_code}'
-            ])
-        else:
-            new_columns.append(f'{mp_code}')
+        new_columns = ['estudiant']
+        for mp_code in mp_codes:
+            for ra in mp_groups[mp_code]:
+                new_columns.append(ra)
+            if mp_code in mp_codes_with_em:
+                new_columns.extend([
+                    f'{mp_code} CENTRE',
+                    f'{mp_code} EMPRESA',
+                    f'{mp_code}'
+                ])
+            else:
+                new_columns.append(f'{mp_code}')
 
-    export_df = df_without_mp_grades.copy()
+        export_df = df_without_mp_grades.copy()
 
-    em_to_mp = {}
-    for mp_code in mp_codes_with_em:
-        em_codes = [col for col in export_df.columns if col.startswith(f'{mp_code}_') and col.endswith('EM')]
-        for em_code in em_codes:
-            em_to_mp[em_code] = mp_code
+        em_to_mp = {}
+        for mp_code in mp_codes_with_em:
+            em_codes = [col for col in export_df.columns if col.startswith(f'{mp_code}_') and col.endswith('EM')]
+            for em_code in em_codes:
+                em_to_mp[em_code] = mp_code
 
-    for col_name in new_columns:
-        if col_name not in export_df.columns:
-            export_df[col_name] = pd.Series(dtype='float64', index=export_df.index)
+        for col_name in new_columns:
+            if col_name not in export_df.columns:
+                export_df[col_name] = pd.Series(dtype='float64', index=export_df.index)
 
-    export_df = export_df.reindex(columns=new_columns)
+        export_df = export_df.reindex(columns=new_columns)
 
-    for mp_code in mp_grade_columns:
-        if mp_code in export_df.columns:
-            export_df[mp_code] = df[mp_code]
+        for mp_code in mp_grade_columns:
+            if mp_code in export_df.columns:
+                export_df[mp_code] = df[mp_code]
 
-    export_df = _blank_literal_na(export_df)
+        export_df = _blank_literal_na(export_df)
 
-    # Add sequential index column
-    export_df.insert(0, '#', range(1, len(export_df) + 1))
+        # Add sequential index column
+        export_df.insert(0, '#', range(1, len(export_df) + 1))
 
     output_path = output_path.replace('.csv', '.xlsx')
-    export_df.to_excel(output_path, index=False)
+    with timings.measure("initial_to_excel"):
+        export_df.to_excel(output_path, index=False)
 
-    wb = load_workbook(output_path)
-    ws = wb.active
+    with timings.measure("load_workbook_for_em_rewrite"):
+        wb = load_workbook(output_path)
+        ws = wb.active
 
     def get_col_letter(header):
         for cell in ws[1]:
@@ -321,33 +327,47 @@ def export_excel_with_spacing(
     if em_to_mp:
         # EM values are copied into the user-facing "EMPRESA" column and the raw EM
         # column is removed so recipients see business terminology instead of parser terms.
-        for em_code, mp_code in em_to_mp.items():
-            empresa_header = f'{mp_code} EMPRESA'
-            em_col = get_col_letter(em_code)
-            empresa_col = get_col_letter(empresa_header)
-            if em_col and empresa_col:
-                for row_idx in range(2, ws.max_row + 1):
-                    em_cell = ws[f'{em_col}{row_idx}']
-                    empresa_cell = ws[f'{empresa_col}{row_idx}']
-                    if em_cell.value is not None:
-                        empresa_cell.value = em_cell.value
-                ws.delete_cols(ws[em_col][0].column, 1)
-        wb.save(output_path)
+        with timings.measure("rewrite_em_columns"):
+            for em_code, mp_code in em_to_mp.items():
+                empresa_header = f'{mp_code} EMPRESA'
+                em_col = get_col_letter(em_code)
+                empresa_col = get_col_letter(empresa_header)
+                if em_col and empresa_col:
+                    for row_idx in range(2, ws.max_row + 1):
+                        em_cell = ws[f'{em_col}{row_idx}']
+                        empresa_cell = ws[f'{empresa_col}{row_idx}']
+                        if em_cell.value is not None:
+                            empresa_cell.value = em_cell.value
+                    ws.delete_cols(ws[em_col][0].column, 1)
+        with timings.measure("save_after_em_rewrite"):
+            wb.save(output_path)
 
-    export_df = pd.read_excel(output_path)
-    export_df = _blank_literal_na(export_df)
+    with timings.measure("reload_dataframe_from_workbook"):
+        export_df = pd.read_excel(output_path)
+        export_df = _blank_literal_na(export_df)
 
-    numeric_cols = export_df.select_dtypes(include=['int64', 'float64']).columns
-    for col in numeric_cols:
-        export_df[col] = pd.to_numeric(export_df[col], errors='coerce').astype('float64')
+    with timings.measure("normalize_export_dataframe"):
+        numeric_cols = export_df.select_dtypes(include=['int64', 'float64']).columns
+        for col in numeric_cols:
+            export_df[col] = pd.to_numeric(export_df[col], errors='coerce').astype('float64')
 
-    non_numeric_cols = export_df.columns.difference(numeric_cols)
-    export_df[non_numeric_cols] = export_df[non_numeric_cols].fillna('')
+        non_numeric_cols = export_df.columns.difference(numeric_cols)
+        export_df[non_numeric_cols] = export_df[non_numeric_cols].fillna('')
 
-    export_df.to_excel(output_path, index=False)
+    with timings.measure("rewrite_workbook_from_dataframe"):
+        export_df.to_excel(output_path, index=False)
 
-    apply_row_formatting(output_path, mp_codes_with_em, mp_codes)
-    apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes)
+    with timings.measure("apply_row_formatting"):
+        apply_row_formatting(output_path, mp_codes_with_em, mp_codes)
+    with timings.measure("apply_conditional_formatting"):
+        apply_conditional_formatting(output_path, mp_groups, mp_codes_with_em, mp_codes)
+    timings.log(
+        output_path=output_path,
+        student_rows=len(export_df),
+        output_columns=len(export_df.columns),
+        mp_count=len(mp_codes),
+        mp_with_em_count=len(mp_codes_with_em),
+    )
     print(f"\t- Exported {len(export_df)} entries to {output_path}")
 
 
