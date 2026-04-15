@@ -82,6 +82,21 @@ Per a la web actual, els directoris rellevants en execució són principalment `
 - Docker
 - Python 3.9+ només si vols executar scripts locals fora del contenidor
 
+## Tests públics
+
+Hi ha una suite pública de regressió pensada per protegir la lògica de transformació, l'exportació a Excel, l'empaquetat ZIP i alguns fluxos HTTP bàsics sense incloure PDFs privats al repositori.
+
+Execució ràpida:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
+```
+
+La fidelitat real de l'extracció de PDFs d'Esfer@ continua requerint proves manuals o un corpus privat fora del repositori públic.
+
 ## Estructura del projecte
 
 ```text
