@@ -40,9 +40,12 @@ dist/
 *.bak
 discarded_tests/
 original_pdf_files/
+testing_files/
 
 # Ignore contents of input and output directories
 ##############################
+failed_uploads/*
+!failed_uploads/.gitkeep
 01_source_pdfs/*
 !01_source_pdfs/.gitkeep
 02_extracted_data/*

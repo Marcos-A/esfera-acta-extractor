@@ -30,6 +30,7 @@ def _extract_mp_codes_from_columns(columns: list[str]) -> list[str]:
 MAX_READ_ATTEMPTS = 3
 READ_RETRY_DELAY_SECONDS = 5
 
+
 def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
     """
     Build a smaller summary workbook from a detailed conversion result.
@@ -130,7 +131,9 @@ def generate_summary_report(source_xlsx_path: str, output_summary_path: str):
     # Add numbered column as the first column
     summary_df.insert(0, '#', range(1, len(summary_df) + 1))
 
-    # 5. Write to New XLSX and Apply Formatting
+    # Build the same summary dataframe again for the formatting step. This is older CLI
+    # code rather than the main web path, so the goal here is readability and stability
+    # rather than squeezing out more performance.
     try:
         with pd.ExcelWriter(output_summary_path, engine='openpyxl') as writer:
             summary_df.to_excel(writer, index=False, sheet_name='Summary')

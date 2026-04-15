@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 
 
 def compare_workbooks(left_path: Path, right_path: Path, diff_limit: int) -> dict[str, object]:
+    """Compare the first worksheet of two exported workbooks for regression checks."""
     left_wb = load_workbook(left_path)
     right_wb = load_workbook(right_path)
     left_ws = left_wb.active
@@ -24,6 +25,7 @@ def compare_workbooks(left_path: Path, right_path: Path, diff_limit: int) -> dic
     diffs: list[dict[str, object]] = []
     max_row = max(left_ws.max_row, right_ws.max_row)
     max_col = max(left_ws.max_column, right_ws.max_column)
+    # Stop after diff_limit mismatches so the output stays readable during quick checks.
     for row in range(1, max_row + 1):
         for col in range(1, max_col + 1):
             left_value = left_ws.cell(row=row, column=col).value
@@ -57,6 +59,7 @@ def compare_workbooks(left_path: Path, right_path: Path, diff_limit: int) -> dic
 
 
 def main() -> None:
+    """CLI entrypoint for quick workbook diffing during performance or refactor work."""
     parser = argparse.ArgumentParser(description="Compare two XLSX workbooks.")
     parser.add_argument("left", type=Path)
     parser.add_argument("right", type=Path)

@@ -103,6 +103,7 @@ def _should_delete_by_age(job: dict[str, Any], now: datetime, retention_days: in
 
 
 def _oldest_job_with_artifacts(jobs: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Pick the oldest remaining failed job that still has files on disk."""
     for job in jobs:
         if _job_has_artifacts(job):
             return job

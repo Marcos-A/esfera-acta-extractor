@@ -46,6 +46,8 @@ class TimingRecorder:
         if not self.enabled:
             return
 
+        # One structured line per operation is easier to diff and grep than many small
+        # print statements scattered across the conversion pipeline.
         payload: dict[str, object] = {
             "event": "perf_timing",
             "label": self.label,

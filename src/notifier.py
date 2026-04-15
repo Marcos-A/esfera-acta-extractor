@@ -19,6 +19,8 @@ def notify_failure(subject: str, body: str) -> None:
     Best-effort notification.
     Tries Telegram, SMTP, and generic webhook delivery when configured.
     """
+    # Channels are attempted independently so one broken integration does not prevent
+    # another configured path from still delivering the alert.
     telegram_sent = _safe_send("Telegram", _send_telegram_message, subject, body)
     smtp_sent = _safe_send("SMTP", _send_smtp_message, subject, body)
     webhook_sent = _safe_send("webhook", _send_webhook_message, subject, body)
@@ -32,6 +34,7 @@ def _safe_send(
     subject: str,
     body: str,
 ) -> bool:
+    """Wrap one notification channel so failures degrade to logging instead of crashing."""
     try:
         return sender(subject, body)
     except Exception as exc:
@@ -91,6 +94,8 @@ def _send_smtp_message(subject: str, body: str) -> bool:
             server.send_message(message)
         return True
 
+    # STARTTLS is the default because many providers expose a plain SMTP port that is
+    # immediately upgraded to TLS after connecting.
     with smtplib.SMTP(host, port_number) as server:
         if os.getenv("SMTP_USE_TLS", "1") == "1":
             server.starttls(context=ssl.create_default_context())

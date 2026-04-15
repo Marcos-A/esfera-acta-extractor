@@ -45,6 +45,7 @@ class ConversionResult:
     """Collects all files produced from a single request."""
     artifacts: list[ConversionArtifact]
 
+
 def convert_pdf_to_excel(
     pdf_path: str | Path,
     output_dir: str | Path,
@@ -80,6 +81,8 @@ def convert_pdf_to_excel(
 
     code_pattern = re.compile(r"^Codi \(Conv\) - Qual(?:\.\d+)?$", re.IGNORECASE)
     melted = select_melt_code_conv_grades(merged, name_col, code_pattern)
+    # Each melted row contains one original "code/grade" text fragment that may hide
+    # several RA, EM, or MP values in a single cell.
     melted["entry"] = clean_entries(melted["entry"])
 
     ra_entry_pattern = re.compile(
@@ -129,6 +132,8 @@ def convert_pdf_to_excel(
         mp_codes_with_em = find_mp_codes_with_em(melted, mp_codes)
         combined_records = sort_records(combined_records)
 
+        # The workbook layout expects one row per student and one column per code, so
+        # pivot the long-form records back into a wide table at the end of parsing.
         wide = combined_records.pivot(index="estudiant", columns="code", values="grade")
         for col in wide.columns:
             if col != "estudiant":
@@ -227,7 +232,9 @@ def build_zip_from_artifacts(artifacts: list[ConversionArtifact], destination: s
     archive_names: set[str] = set()
     timings = TimingRecorder("build_zip_from_artifacts")
     with timings.measure("zip_artifacts"):
-        with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        # XLSX files are already ZIP-based internally, so storing them without another
+        # compression pass is usually faster and rarely saves meaningful space.
+        with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_STORED) as archive:
             for artifact in artifacts:
                 archive_name = _dedupe_name(artifact.output_name, archive_names)
                 archive_names.add(archive_name)

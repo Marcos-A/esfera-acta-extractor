@@ -25,6 +25,8 @@ def extract_records(
     for row in melted.itertuples(index=False, name=None):
         student_name = row[name_col_index]
         entry_value = row[entry_index]
+        # One text cell can contain multiple code/grade pairs, so regex extraction
+        # yields zero, one, or many output rows for the same input record.
         for code, grade in entry_pattern.findall(entry_value):
             # Normalize whitespace in code
             code = re.sub(r"\s+", "", code)
@@ -106,6 +108,8 @@ def sort_records(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean student names and sort records in a predictable order.
     """
+    # Normalizing embedded line breaks here keeps later pivoting deterministic even if
+    # the PDF extractor preserved the original wrapped text layout.
     df['estudiant'] = df['estudiant'].str.replace(r"\s*\n\s*", ' ', regex=True).str.strip()
     df = df.sort_values(
         by=['estudiant', 'code'],

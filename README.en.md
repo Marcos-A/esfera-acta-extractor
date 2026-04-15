@@ -75,6 +75,8 @@ The primary output is an Excel workbook matching the same kind of structure the 
 
 The legacy CLI path can also generate summary workbooks in `03_final_grade_summaries`.
 
+For the current web app, the main runtime directories are `data/` and `failed_uploads/`. The `01_source_pdfs/`, `02_extracted_data/`, and `03_final_grade_summaries/` directories are kept only for compatibility with the legacy CLI workflow.
+
 ## Requirements
 
 - Docker
@@ -107,11 +109,11 @@ The legacy CLI path can also generate summary workbooks in `03_final_grade_summa
 │   ├── install-retention-cron.sh.example # Cron installer for retention cleanup
 │   └── esfera2excel-retention.logrotate.example # Logrotate rule for the cleanup log
 ├── .env.local.example                    # Example local environment file
-├── data/                                 # SQLite database and persisted runtime data
-├── failed_uploads/                       # Temporarily retained failed uploads for debugging
-├── 01_source_pdfs/                       # Input directory for legacy CLI mode
-├── 02_extracted_data/                    # Legacy CLI Excel output
-├── 03_final_grade_summaries/             # Legacy CLI summary output
+├── data/                                 # SQLite database and persisted web runtime data
+├── failed_uploads/                       # Temporarily retained web failures for debugging
+├── 01_source_pdfs/                       # Compatibility input directory for legacy CLI mode
+├── 02_extracted_data/                    # Compatibility Excel output for legacy CLI mode
+├── 03_final_grade_summaries/             # Compatibility summary output for legacy CLI mode
 ├── original_pdf_files/                   # Optional manual test PDFs, gitignored
 └── esfera-acta-extractor.py              # Entry point for the legacy CLI workflow
 ```

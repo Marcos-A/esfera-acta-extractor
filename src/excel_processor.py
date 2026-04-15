@@ -70,6 +70,8 @@ def export_excel_with_spacing(
 
         new_columns = ['estudiant']
         for mp_code in mp_codes:
+            # Keep RA columns grouped under their parent MP so the final workbook reads
+            # left-to-right the way staff expect when reviewing one module at a time.
             for ra in mp_groups[mp_code]:
                 new_columns.append(ra)
             if mp_code in mp_codes_with_em:
@@ -214,6 +216,8 @@ def _apply_row_formatting_to_sheet(
         else:
             mp_code = _get_mp_for_ra(value, mp_codes)
             if mp_code:
+                # RA columns inherit their parent MP color so printed workbooks still
+                # show which detailed assessments belong to the same module.
                 fill = type_a_fill if mp_code in mp_codes_with_em_set else type_b_fill
                 alignment = center_aligned
                 formatted_value = _format_ra_header(value)
@@ -263,6 +267,8 @@ def _apply_row_formatting_to_sheet(
             ws.column_dimensions[col_letter].width = ra_column_width
 
     legend_start_row = last_row + 2
+    # The legend stays inside the sheet because exported files are often shared or
+    # printed on their own, without extra documentation.
     for offset, (fill, text) in enumerate([
         (type_a_fill, "MP amb estada a l'empresa"),
         (type_b_fill, "MP sense estada a l'empresa")
@@ -302,6 +308,8 @@ def _apply_conditional_formatting_to_sheet(
         range_ref = f'{col_letter}2:{col_letter}{last_student_row}'
         first_cell_ref = f'{col_letter}2'
 
+        # Rules are written against the first row of the range because Excel shifts the
+        # relative reference automatically for each cell in the formatted range.
         orange_formula = (
             f'OR(ISNUMBER(SEARCH("PDT",{first_cell_ref})),'
             f'ISNUMBER(SEARCH("EP",{first_cell_ref})),'

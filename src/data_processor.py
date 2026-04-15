@@ -83,6 +83,8 @@ def select_melt_code_conv_grades(
     Melt only columns matching code_pattern into long form.
     """
     cols = [c for c in df.columns if code_pattern.match(c)]
+    # Long form is easier for regex extraction because each grade fragment can then be
+    # processed independently instead of scanning the entire row at once.
     melted = df.melt(
         id_vars=[name_col],
         value_vars=cols,

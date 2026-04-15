@@ -61,6 +61,8 @@ def extract_group_code_and_tables(
             group_code = _extract_group_code_from_text(first_page_text)
 
         for page in pdf.pages:
+            # The current pipeline expects the main student table from each page. Pages
+            # without a detectable table are simply skipped.
             raw = page.extract_table(table_opts)
             if not raw:
                 continue
@@ -74,6 +76,7 @@ def _extract_group_code_from_text(text: str) -> str:
     """Extract the group code from the first-page text block."""
     lines = text.split('\n')
     for index, line in enumerate(lines):
+        # Esfer@ prints the label on one line and the actual value on the next line.
         if 'Codi del grup' in line and index + 1 < len(lines):
             group_code = lines[index + 1].strip()
             return group_code.replace(' ', '_')

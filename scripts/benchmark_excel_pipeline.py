@@ -31,10 +31,12 @@ DEFAULT_SAMPLE_WORKBOOK = Path(
 
 
 def _normalize_header(header: object) -> str:
+    """Normalize header text to the same shape used by the export code."""
     return str(header or "").replace("\n", "").strip()
 
 
 def _parse_sample_workbook(sample_workbook: Path) -> tuple[list[str], list[str], dict[str, str], list[str]]:
+    """Infer MP/RA/EM structure from a real workbook so the benchmark stays realistic."""
     wb = load_workbook(sample_workbook)
     ws = wb.active
     headers = [_normalize_header(ws.cell(row=1, column=index).value) for index in range(1, ws.max_column + 1)]
@@ -71,6 +73,7 @@ def _build_synthetic_dataframe(
     sample_workbook: Path,
     student_count: int,
 ) -> tuple[pd.DataFrame, list[str], list[str]]:
+    """Create a repeatable in-memory dataset that looks like a typical export input."""
     ra_headers, mp_codes, em_headers_by_mp, _headers = _parse_sample_workbook(sample_workbook)
 
     rows: list[dict[str, object]] = []
@@ -93,6 +96,7 @@ def _build_synthetic_dataframe(
 
 
 def benchmark(sample_workbook: Path, student_count: int, runs: int) -> dict[str, object]:
+    """Run the export benchmark several times and summarize the durations."""
     df, _em_headers, mp_codes = _build_synthetic_dataframe(sample_workbook, student_count=student_count)
 
     mp_codes_with_em = sorted(
@@ -104,6 +108,8 @@ def benchmark(sample_workbook: Path, student_count: int, runs: int) -> dict[str,
     )
 
     output_dir = Path(tempfile.mkdtemp(prefix="esfera-benchmark-"))
+    # Force perf timing on for the benchmark process so stage-by-stage logs are emitted
+    # even if the caller's shell environment normally leaves them disabled.
     os.environ["PERF_TIMING_ENABLED"] = "1"
     durations: list[float] = []
 

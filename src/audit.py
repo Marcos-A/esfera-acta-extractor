@@ -260,6 +260,7 @@ class AuditStore:
         )
 
     def list_error_jobs(self) -> list[dict[str, Any]]:
+        """Return failed jobs oldest-first so retention cleanup can delete safely by age."""
         return self._query_all(
             """
             SELECT
@@ -291,6 +292,7 @@ class AuditStore:
         )
 
     def list_recent_files(self, limit: int = 200) -> list[dict[str, Any]]:
+        """Return the per-file conversion log used by the admin dashboard."""
         return self._query_all(
             """
             SELECT
@@ -394,17 +396,20 @@ class AuditStore:
         )
 
     def _execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
+        """Run one write query with a short-lived connection."""
         with closing(sqlite3.connect(self.db_path)) as connection:
             connection.execute(sql, params)
             connection.commit()
 
     def _query_all(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        """Return all rows as plain dictionaries to keep callers framework-agnostic."""
         with closing(sqlite3.connect(self.db_path)) as connection:
             connection.row_factory = sqlite3.Row
             cursor = connection.execute(sql, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def _query_one(self, sql: str, params: tuple[Any, ...] = ()) -> dict[str, Any] | None:
+        """Return one row as a dictionary, or None when no record matches."""
         with closing(sqlite3.connect(self.db_path)) as connection:
             connection.row_factory = sqlite3.Row
             cursor = connection.execute(sql, params)

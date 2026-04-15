@@ -75,6 +75,8 @@ La sortida principal és un fitxer Excel amb el mateix tipus d'estructura que el
 
 Addicionalment, el codi històric encara pot generar resums de qualificacions al directori `03_final_grade_summaries` quan s'executa per CLI.
 
+Per a la web actual, els directoris rellevants en execució són principalment `data/` i `failed_uploads/`. Els directoris `01_source_pdfs/`, `02_extracted_data/` i `03_final_grade_summaries/` es mantenen només per compatibilitat amb la via CLI antiga.
+
 ## Requisits
 
 - Docker
@@ -107,11 +109,11 @@ Addicionalment, el codi històric encara pot generar resums de qualificacions al
 │   ├── install-retention-cron.sh.example # Instal·lador de cron per a neteja
 │   └── esfera2excel-retention.logrotate.example # Rotació del log de neteja
 ├── .env.local.example                    # Variables d'entorn locals de mostra
-├── data/                                 # Base SQLite i dades persistides en local o al servidor
-├── failed_uploads/                       # Errors conservats temporalment per a depuració
-├── 01_source_pdfs/                       # Entrada per a la via CLI antiga
-├── 02_extracted_data/                    # Sortida Excel de la via CLI antiga
-├── 03_final_grade_summaries/             # Resums de la via CLI antiga
+├── data/                                 # Base SQLite i dades persistides de la web
+├── failed_uploads/                       # Errors conservats temporalment per la web
+├── 01_source_pdfs/                       # Entrada de compatibilitat per a la via CLI antiga
+├── 02_extracted_data/                    # Sortida Excel de compatibilitat per a la via CLI antiga
+├── 03_final_grade_summaries/             # Resums de compatibilitat per a la via CLI antiga
 ├── original_pdf_files/                   # Carpeta opcional per a proves manuals, ignorada per Git
 └── esfera-acta-extractor.py              # Punt d'entrada de la via CLI antiga
 ```

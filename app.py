@@ -46,6 +46,8 @@ from src.notifier import notify_failure
 def create_app() -> Flask:
     """Create the Flask application used by the public upload flow and admin UI."""
     app = Flask(__name__)
+    # Default local paths make the app usable straight from a checkout, while
+    # production can override them with mounted persistent storage.
     default_data_dir = str(Path(app.root_path) / "data")
     default_failure_dir = str(Path(app.root_path) / "failed_uploads")
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "change-me-before-production")
@@ -91,6 +93,7 @@ def create_app() -> Flask:
 
     @app.route("/admin/login", methods=["GET", "POST"])
     def admin_login():
+        """Authenticate the lightweight built-in admin area."""
         error = None
         if request.method == "POST":
             username = request.form.get("username", "")
@@ -174,6 +177,7 @@ def create_app() -> Flask:
 
     @app.post("/convert")
     def convert():
+        """Receive one PDF, several PDFs, or a ZIP and enqueue background processing."""
         job_id = uuid.uuid4().hex
         uploaded_files = [
             uploaded_file
@@ -201,6 +205,8 @@ def create_app() -> Flask:
         extracted_dir: Path | None = None
         upload_path = work_dir / source_name
         if request_type == "pdf_batch":
+            # Store manually-selected PDFs in a temporary ZIP so the downstream batch
+            # path can treat multi-upload and uploaded ZIP requests the same way.
             with zipfile.ZipFile(upload_path, "w", compression=zipfile.ZIP_STORED) as archive:
                 archive_names: set[str] = set()
                 for uploaded_file, uploaded_name in zip(uploaded_files, source_names):
@@ -340,6 +346,8 @@ def _retain_failed_job(
 
     output_dir = work_dir / "output"
     if output_dir.exists():
+        # Partial output is often the fastest way to understand where a conversion went
+        # wrong, so keep it next to the original source file for the same job id.
         target_output = target_dir / "output"
         shutil.copytree(output_dir, target_output, dirs_exist_ok=True)
 
@@ -453,6 +461,8 @@ def _run_conversion_job(
                 failed_files.append(
                     {
                         "source_name": pdf_path.name,
+                        # Keep the public-facing error short and non-technical, while
+                        # the retained failure log keeps the full traceback for admins.
                         "error_message": _public_file_error_message(file_exc),
                     }
                 )
@@ -503,6 +513,8 @@ def _run_conversion_job(
             returned_file_count=len(artifacts),
         )
         if failed_files:
+            # Partial success is still a successful user-facing result, but the server
+            # keeps a debug copy so administrators can inspect the failed inputs later.
             partial_debug_path = _retain_failed_job(app.config["FAILURE_ROOT"], job_id, source_name, upload_path, work_dir)
             current_job = app.audit_store.get_job(job_id)
             existing_metadata = _load_metadata((current_job or {}).get("metadata_json"))
@@ -530,6 +542,8 @@ def _run_conversion_job(
                 ),
             )
     except Exception as exc:
+        # Full-job failures keep both the source input and a plain-text failure log so
+        # support staff can diagnose issues without reproducing the upload immediately.
         debug_path = _retain_failed_job(app.config["FAILURE_ROOT"], job_id, source_name, upload_path, work_dir)
         current_job = app.audit_store.get_job(job_id)
         existing_metadata = _load_metadata((current_job or {}).get("metadata_json"))
@@ -621,6 +635,8 @@ def _delete_job_artifacts(app: Flask, job: dict[str, object], *, reason: str) ->
     metadata["failure_log_path"] = None
     metadata["artifacts_deleted_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     metadata["artifacts_deleted_reason"] = reason
+    # The audit row stays in place even after files are deleted so administrators keep
+    # the historical record of the failed job and its cleanup.
     app.audit_store.update_job_artifact_metadata(
         str(job["job_id"]),
         debug_path=retained_debug_path,
