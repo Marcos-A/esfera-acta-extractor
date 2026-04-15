@@ -2,6 +2,8 @@
 
 # Esfer@ Acta Extractor
 
+[![pytest](https://github.com/Marcos-A/esfera-acta-extractor/actions/workflows/pytest.yml/badge.svg)](https://github.com/Marcos-A/esfera-acta-extractor/actions/workflows/pytest.yml)
+
 Aplicació per convertir actes d'Esfer@ en PDF a fitxers Excel. El projecte inclou:
 
 - una aplicació web per pujar un o diversos PDFs, o un ZIP amb diversos PDFs

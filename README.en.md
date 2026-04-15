@@ -2,6 +2,8 @@
 
 # Esfer@ Acta Extractor
 
+[![pytest](https://github.com/Marcos-A/esfera-acta-extractor/actions/workflows/pytest.yml/badge.svg)](https://github.com/Marcos-A/esfera-acta-extractor/actions/workflows/pytest.yml)
+
 Application for converting Esfer@ PDF grade reports into Excel files. The project includes:
 
 - a web app that accepts one or more PDFs, or a ZIP containing multiple PDFs
