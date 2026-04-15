@@ -82,6 +82,21 @@ For the current web app, the main runtime directories are `data/` and `failed_up
 - Docker
 - Python 3.9+ only if you want to run local scripts outside the container
 
+## Public tests
+
+The repository includes a public regression suite aimed at protecting the transformation logic, Excel export behavior, ZIP packaging, and a few basic HTTP flows without storing private PDFs in the repo.
+
+Quick start:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
+```
+
+True Esfer@ PDF parsing fidelity still requires manual checks or a private corpus kept outside the public repository.
+
 ## Project structure
 
 ```text

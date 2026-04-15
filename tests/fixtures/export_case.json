@@ -1,0 +1,24 @@
+{
+  "mp_codes": ["MP01", "MP02"],
+  "mp_codes_with_em": ["MP01"],
+  "rows": [
+    {
+      "estudiant": "Alice Example",
+      "MP01_CF01_1RA": 7,
+      "MP01_CF01_2RA": "PDT",
+      "MP01_CF01_1EM": 8.5,
+      "MP01": 8,
+      "MP02_CF02_1RA": "NA",
+      "MP02": 4
+    },
+    {
+      "estudiant": "Bob Example",
+      "MP01_CF01_1RA": 5,
+      "MP01_CF01_2RA": 6,
+      "MP01_CF01_1EM": 7.25,
+      "MP01": 6,
+      "MP02_CF02_1RA": 9,
+      "MP02": 9
+    }
+  ]
+}
