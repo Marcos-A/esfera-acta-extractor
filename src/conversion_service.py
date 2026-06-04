@@ -49,6 +49,7 @@ class ConversionResult:
 def convert_pdf_to_excel(
     pdf_path: str | Path,
     output_dir: str | Path,
+    include_summary_sheet: bool = False,
 ) -> Path:
     """
     Process one Esfer@ acta PDF and write its Excel workbook.
@@ -156,6 +157,7 @@ def convert_pdf_to_excel(
             str(output_xlsx),
             mp_codes_with_em,
             mp_codes,
+            include_summary_sheet=include_summary_sheet,
         )
     timings.log(
         pdf_path=pdf_path.name,

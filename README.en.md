@@ -35,6 +35,9 @@ Literal `NA` values are treated as empty cells.
 - Public interface in Catalan
 - PDF or ZIP upload
 - Cumulative file selection in the browser before starting conversion
+- Option to add a second `Resum` worksheet to the exported Excel file
+- `Resum` worksheet with pending RAs per student and a free-form observations column
+- Friendly MP names in `Resum` when available in the bundled catalog; otherwise the raw code is shown
 - Asynchronous conversion flow
 - Progress bar with intermediate status messages
 - User-friendly public error messages
@@ -74,6 +77,13 @@ Literal `NA` values are treated as empty cells.
 ## Generated outputs
 
 The primary output is an Excel workbook matching the same kind of structure the project has historically generated in `02_extracted_data`.
+
+Optionally, the web app can also append a second `Resum` worksheet inside the same `.xlsx` file:
+
+- main `Acta` worksheet with the detailed export
+- `Resum` worksheet with pending RAs grouped by MP
+- dedicated header styling for quick manual follow-up
+- MP labels in `Code. Friendly name` format when a match exists in `src/data/mp_code_names.json`
 
 The legacy CLI path can also generate summary workbooks in `03_final_grade_summaries`.
 
@@ -117,8 +127,10 @@ True Esfer@ PDF parsing fidelity still requires manual checks or a private corpu
 │   ├── pdf_processor.py                  # PDF table and metadata extraction
 │   ├── data_processor.py                 # Data cleanup and transformation
 │   ├── grade_processor.py                # Grade-specific logic
-│   ├── excel_processor.py                # Main Excel generation
-│   └── summary_generator.py              # Legacy CLI summary generation
+│   ├── excel_processor.py                # Main Excel generation and optional Resum worksheet
+│   ├── summary_generator.py              # Legacy CLI summary generation
+│   └── data/
+│       └── mp_code_names.json            # Bundled MP code to friendly-name catalog for Resum
 ├── scripts/
 │   ├── cleanup_failed_uploads.py         # Automatic cleanup for retained failures
 │   ├── run-local-web.sh.example          # Local startup template
@@ -228,6 +240,7 @@ Retention policy:
 
 - the file is received
 - it is converted into one Excel workbook
+- if the user selects the option in the form, the `.xlsx` also includes a `Resum` worksheet
 - the user downloads the `.xlsx`
 - the uploaded file and working directory are then deleted
 

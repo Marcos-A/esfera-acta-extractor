@@ -201,6 +201,8 @@ def create_app() -> Flask:
             source_name = "selected_files-converted.zip"
             request_type = "pdf_batch"
 
+        include_summary_sheet = request.form.get("include_summary_sheet") == "on"
+
         work_dir = Path(tempfile.mkdtemp(prefix=f"esfera-job-{job_id}-", dir=app.config["UPLOAD_ROOT"]))
         extracted_dir: Path | None = None
         upload_path = work_dir / source_name
@@ -233,11 +235,11 @@ def create_app() -> Flask:
             message="Fitxer rebut. Preparant la conversió.",
             progress_current=0,
             progress_total=1,
-            metadata={},
+            metadata={"include_summary_sheet": include_summary_sheet},
         )
         threading.Thread(
             target=_run_conversion_job,
-            args=(app, job_id, request_type, source_name, upload_path, work_dir),
+            args=(app, job_id, request_type, source_name, upload_path, work_dir, include_summary_sheet),
             daemon=True,
         ).start()
         return jsonify(
@@ -361,6 +363,7 @@ def _run_conversion_job(
     source_name: str,
     upload_path: Path,
     work_dir: Path,
+    include_summary_sheet: bool = False,
 ) -> None:
     """
     Run the conversion in a background thread and keep the audit trail updated.
@@ -385,9 +388,13 @@ def _run_conversion_job(
                 message="Convertint el fitxer 1 de 1",
                 progress_current=0,
                 progress_total=1,
-                metadata={"work_dir": str(work_dir)},
+                metadata={"work_dir": str(work_dir), "include_summary_sheet": include_summary_sheet},
             )
-            output_path = convert_pdf_to_excel(upload_path, output_dir)
+            output_path = convert_pdf_to_excel(
+                upload_path,
+                output_dir,
+                include_summary_sheet=include_summary_sheet,
+            )
             app.audit_store.record_file_result(
                 job_id=job_id,
                 source_name=source_name,
@@ -435,9 +442,17 @@ def _run_conversion_job(
                     message=f"Convertint el fitxer {index} de {source_file_count}",
                     progress_current=index - 1,
                     progress_total=source_file_count + 1,
-                    metadata={"work_dir": str(work_dir), "current_file": pdf_path.name},
+                    metadata={
+                    "work_dir": str(work_dir),
+                    "current_file": pdf_path.name,
+                    "include_summary_sheet": include_summary_sheet,
+                },
                 )
-                output_path = convert_pdf_to_excel(pdf_path, output_dir)
+                output_path = convert_pdf_to_excel(
+                    pdf_path,
+                    output_dir,
+                    include_summary_sheet=include_summary_sheet,
+                )
                 artifact = ConversionArtifact(
                     source_name=pdf_path.name,
                     output_name=output_path.name,

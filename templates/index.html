@@ -163,6 +163,24 @@
       .picker-summary {
         color: var(--muted);
       }
+      .option-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .option-row input[type="checkbox"] {
+        inline-size: 18px;
+        block-size: 18px;
+        margin-top: 2px;
+      }
+      .option-copy strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+      .option-copy span {
+        color: var(--muted);
+        display: block;
+      }
       .selected-files {
         margin: 14px 0 0;
         padding: 0;
@@ -219,6 +237,15 @@
             Afegeix un o m&eacute;s fitxers PDF, o b&eacute; un &uacute;nic fitxer ZIP que contingui diversos fitxers PDF.
           </p>
           <ul id="selected-files" class="selected-files" hidden></ul>
+        </div>
+        <div class="panel">
+          <label class="option-row" for="include-summary-sheet">
+            <input id="include-summary-sheet" name="include_summary_sheet" type="checkbox">
+            <span class="option-copy">
+              <strong>Afegeix un segon full resum</strong>
+              <span>Inclou un full extra amb els RA pendents per estudiant i una columna de comentaris en blanc.</span>
+            </span>
+          </label>
         </div>
         <button id="submit-button" type="submit">Converteix els fitxers</button>
       </form>
@@ -328,6 +355,10 @@
         const formData = new FormData();
         for (const file of selectedFiles) {
           formData.append("file", file);
+        }
+        const includeSummarySheet = document.getElementById("include-summary-sheet");
+        if (includeSummarySheet?.checked) {
+          formData.append("include_summary_sheet", "on");
         }
         try {
           const response = await fetch(form.action, {

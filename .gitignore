@@ -77,3 +77,5 @@ run-local-web.sh
 
 # Runtime application state
 data/
+!src/data/
+!src/data/mp_code_names.json

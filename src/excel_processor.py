@@ -2,6 +2,10 @@
 Excel processing module for generating and formatting grade reports.
 """
 
+import json
+from functools import lru_cache
+from pathlib import Path
+
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -11,6 +15,29 @@ from openpyxl.formatting.rule import FormulaRule
 from typing import Optional
 
 from .perf_timing import TimingRecorder
+
+
+@lru_cache(maxsize=1)
+def _load_mp_name_lookup() -> dict[str, str]:
+    """Load the bundled MP-code to friendly-name mapping."""
+    mapping_path = Path(__file__).resolve().parent / 'data' / 'mp_code_names.json'
+    payload = json.loads(mapping_path.read_text(encoding='utf-8'))
+    lookup: dict[str, str] = {}
+    for modules in payload.values():
+        for module in modules:
+            code = module.get('codi')
+            name = module.get('nom')
+            if code and name and code not in lookup:
+                lookup[code] = name
+    return lookup
+
+
+def _format_mp_display_name(mp_code: str) -> str:
+    """Format a summary label as 'Code. Friendly name' when known."""
+    friendly_name = _load_mp_name_lookup().get(mp_code)
+    if friendly_name:
+        return f'{mp_code}. {friendly_name}'
+    return mp_code
 
 
 def apply_row_formatting(
@@ -42,6 +69,7 @@ def export_excel_with_spacing(
     output_path: str,
     mp_codes_with_em: list[str],
     mp_codes: list[str],
+    include_summary_sheet: bool = False,
 ) -> None:
     """
     Export DataFrame to Excel with specific column spacing after each MP's RAs.
@@ -112,10 +140,14 @@ def export_excel_with_spacing(
         with timings.measure("initial_to_excel"):
             export_df.to_excel(writer, index=False)
         ws = writer.sheets[next(iter(writer.sheets))]
+        ws.title = 'Acta'
         with timings.measure("apply_row_formatting"):
             _apply_row_formatting_to_sheet(ws, mp_codes_with_em, mp_codes)
         with timings.measure("apply_conditional_formatting"):
             _apply_conditional_formatting_to_sheet(ws, mp_groups, mp_codes_with_em, mp_codes)
+        if include_summary_sheet:
+            with timings.measure("append_summary_sheet"):
+                _append_pending_ra_summary_sheet(writer, df)
 
     timings.log(
         output_path=output_path,
@@ -138,6 +170,94 @@ def _blank_literal_na(df: pd.DataFrame) -> pd.DataFrame:
             regex=True,
         )
     return cleaned_df
+
+
+def _append_pending_ra_summary_sheet(
+    writer: pd.ExcelWriter,
+    detailed_df: pd.DataFrame,
+) -> None:
+    """Append a teacher-facing worksheet listing pending RAs by student."""
+    summary_df = build_pending_ra_summary_dataframe(detailed_df)
+    summary_df.to_excel(writer, index=False, sheet_name='Resum')
+    ws = writer.sheets['Resum']
+    _apply_pending_ra_summary_formatting(ws, len(summary_df))
+
+
+def build_pending_ra_summary_dataframe(detailed_df: pd.DataFrame) -> pd.DataFrame:
+    """Summarize RA rows that still need follow-up into one text block per student."""
+    summary_rows: list[dict[str, object]] = []
+    columns = detailed_df.columns.tolist()
+    for row_number, row in enumerate(detailed_df.to_dict('records'), start=1):
+        pending_by_mp: dict[str, list[str]] = {}
+        for column_name in columns:
+            if column_name == 'estudiant' or not column_name.endswith('RA'):
+                continue
+            if not _is_pending_ra_grade(row.get(column_name)):
+                continue
+            mp_code, ra_code = _split_ra_code(column_name)
+            pending_by_mp.setdefault(mp_code, []).append(ra_code)
+
+        summary_rows.append(
+            {
+                '#': row_number,
+                'ESTUDIANT': row.get('estudiant', ''),
+                'RA PENDENTS': _format_pending_ra_groups(pending_by_mp),
+                'OBSERVACIONS': '',
+            }
+        )
+
+    return pd.DataFrame(summary_rows, columns=['#', 'ESTUDIANT', 'RA PENDENTS', 'OBSERVACIONS'])
+
+
+def _is_pending_ra_grade(value: object) -> bool:
+    """Treat non-passing or unresolved RA grades as pending."""
+    if pd.isna(value):
+        return False
+    if isinstance(value, str):
+        normalized = value.strip().upper()
+        if normalized in {'PDT', 'EP', 'NA', 'PQ'}:
+            return True
+        try:
+            return float(normalized) < 5
+        except ValueError:
+            return bool(normalized)
+    if isinstance(value, (int, float)):
+        return value < 5
+    return False
+
+
+def _split_ra_code(ra_code: str) -> tuple[str, str]:
+    """Turn 0647_CF01_2RA into ('0647', '2RA')."""
+    parts = ra_code.split('_')
+    if len(parts) < 2:
+        return ra_code, ra_code
+    return parts[0], parts[-1]
+
+
+
+def _format_pending_ra_groups(pending_by_mp: dict[str, list[str]]) -> str:
+    """Format grouped pending RAs as a multiline checklist per MP code."""
+    sections: list[str] = []
+    for mp_code in sorted(pending_by_mp):
+        ra_codes = sorted(pending_by_mp[mp_code], key=_ra_sort_key)
+        lines = "\n".join(f'- {_format_ra_display_code(ra_code)}' for ra_code in ra_codes)
+        sections.append(f'{_format_mp_display_name(mp_code)}:\n{lines}')
+    return "\n\n".join(sections)
+
+
+def _ra_sort_key(ra_code: str) -> tuple[int, str]:
+    """Sort RA labels numerically so RA10 appears after RA9."""
+    digits = ''.join(ch for ch in ra_code if ch.isdigit())
+    return int(digits or '0'), ra_code
+
+
+def _format_ra_display_code(ra_code: str) -> str:
+    """Normalize RA codes from forms like 01RA into display labels like RA1."""
+    digits = ''.join(ch for ch in ra_code if ch.isdigit())
+    if digits:
+        return f'RA{int(digits)}'
+    return ra_code
+
 
 
 def _format_ra_header(header: str) -> str:
@@ -350,3 +470,67 @@ def _apply_conditional_formatting_to_sheet(
             col_letter = get_column_for_header(header)
             if col_letter:
                 apply_rules_to_column(col_letter)
+
+
+
+def _apply_pending_ra_summary_formatting(ws: Worksheet, row_count: int) -> None:
+    """Apply readable formatting to the pending-RA summary sheet."""
+    ws.freeze_panes = 'C2'
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    bold_font = Font(bold=True)
+    header_font = Font(bold=True, color='FFFFFF')
+    shared_header_font = Font(bold=True)
+    center_aligned = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    left_aligned = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    header_fill = PatternFill(start_color='1C4587', end_color='1C4587', fill_type='solid')
+    shared_header_fill = PatternFill(start_color='D9D9D9', end_color='D9D9D9', fill_type='solid')
+    alt_fill_even = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
+    alt_fill_odd = PatternFill(start_color='EEF6FF', end_color='EEF6FF', fill_type='solid')
+
+    ws.row_dimensions[1].height = 34
+    for row_idx in range(2, row_count + 2):
+        row_values = [ws.cell(row=row_idx, column=column).value for column in range(1, 5)]
+        max_lines = max(_count_display_lines(value) for value in row_values)
+        ws.row_dimensions[row_idx].height = max(24, 16 * max_lines + 8)
+
+    for row in ws.iter_rows(min_row=1, max_row=row_count + 1, max_col=4):
+        row_idx = row[0].row
+        row_fill = alt_fill_even if row_idx % 2 == 0 else alt_fill_odd
+        for cell in row:
+            cell.border = border
+            if row_idx == 1:
+                if cell.column in {1, 2}:
+                    cell.font = shared_header_font
+                    cell.fill = shared_header_fill
+                else:
+                    cell.font = header_font
+                    cell.fill = header_fill
+                cell.alignment = center_aligned if cell.column != 2 else left_aligned
+            else:
+                cell.fill = row_fill
+                if cell.column == 1:
+                    cell.font = bold_font
+                    cell.alignment = center_aligned
+                else:
+                    cell.alignment = left_aligned
+
+    ws.column_dimensions['A'].width = 6
+    ws.column_dimensions['B'].width = 34
+    ws.column_dimensions['C'].width = 44
+    ws.column_dimensions['D'].width = 28
+
+
+
+def _count_display_lines(value: object) -> int:
+    """Estimate wrapped spreadsheet lines for row-height sizing."""
+    if value is None:
+        return 1
+    text = str(value)
+    if not text:
+        return 1
+    return max(1, text.count("\n") + 1)

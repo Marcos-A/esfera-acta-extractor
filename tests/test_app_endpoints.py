@@ -53,7 +53,11 @@ def test_convert_rejects_missing_or_invalid_uploads(client) -> None:
 
 
 def test_single_pdf_convert_flow_succeeds_with_stubbed_converter(app_instance, client, monkeypatch, tmp_path: Path) -> None:
-    def fake_convert_pdf_to_excel(pdf_path: str | Path, output_dir: str | Path) -> Path:
+    def fake_convert_pdf_to_excel(
+        pdf_path: str | Path,
+        output_dir: str | Path,
+        include_summary_sheet: bool = False,
+    ) -> Path:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         workbook_path = output_dir / "GROUP_A.xlsx"
@@ -101,3 +105,35 @@ def test_single_pdf_convert_flow_succeeds_with_stubbed_converter(app_instance, c
     assert reopened.active["B2"].value == "Alice Example"
     assert not output_path.exists()
     assert not work_dir.exists()
+
+
+def test_convert_passes_summary_sheet_flag_to_converter(app_instance, client, monkeypatch) -> None:
+    called = {}
+
+    def fake_convert_pdf_to_excel(
+        pdf_path: str | Path,
+        output_dir: str | Path,
+        include_summary_sheet: bool = False,
+    ) -> Path:
+        called['include_summary_sheet'] = include_summary_sheet
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        workbook_path = output_dir / 'GROUP_A.xlsx'
+        workbook = Workbook()
+        workbook.save(workbook_path)
+        return workbook_path
+
+    monkeypatch.setattr(app_module, 'convert_pdf_to_excel', fake_convert_pdf_to_excel)
+    monkeypatch.setattr(app_module.threading, 'Thread', ImmediateThread)
+
+    response = client.post(
+        '/convert',
+        data={
+            'file': (BytesIO(b'%PDF-1.4 fake'), 'sample.pdf'),
+            'include_summary_sheet': 'on',
+        },
+        content_type='multipart/form-data',
+    )
+
+    assert response.status_code == 202
+    assert called['include_summary_sheet'] is True

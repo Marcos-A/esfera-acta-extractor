@@ -35,6 +35,9 @@ Els valors literals `NA` es tracten com a cel·les buides.
 - Interfície pública en català
 - Pujada d'un o diversos PDFs, o d'un ZIP
 - Selecció acumulativa de fitxers des del navegador abans d'iniciar la conversió
+- Opció per afegir un segon full `Resum` al fitxer Excel exportat
+- Full `Resum` amb RA pendents per alumne i columna d'observacions
+- Noms amigables de MP al `Resum` quan existeixen al catàleg intern; si no, es mostra només el codi
 - Seguiment asíncron del progrés de conversió
 - Missatges d'estat intermedis, com ara descompressió, conversió i compressió final
 - Missatges d'error públics pensats per a usuaris finals
@@ -74,6 +77,13 @@ Els valors literals `NA` es tracten com a cel·les buides.
 ## Sortides generades
 
 La sortida principal és un fitxer Excel amb el mateix tipus d'estructura que el projecte ja generava al directori `02_extracted_data`.
+
+Opcionalment, la web també pot afegir un segon full `Resum` dins del mateix `.xlsx`:
+
+- pestanya principal `Acta` amb l'exportació detallada
+- pestanya `Resum` amb els RA pendents agrupats per MP
+- capçaleres amb estil específic per a lectura i seguiment manual
+- etiquetes de MP en format `Codi. Nom amigable` quan existeix correspondència a `src/data/mp_code_names.json`
 
 Addicionalment, el codi històric encara pot generar resums de qualificacions al directori `03_final_grade_summaries` quan s'executa per CLI.
 
@@ -117,8 +127,10 @@ La fidelitat real de l'extracció de PDFs d'Esfer@ continua requerint proves man
 │   ├── pdf_processor.py                  # Extracció de taules i metadades del PDF
 │   ├── data_processor.py                 # Neteja i transformació de dades
 │   ├── grade_processor.py                # Lògica de qualificacions
-│   ├── excel_processor.py                # Generació del fitxer Excel principal
-│   └── summary_generator.py              # Generació de resums per CLI
+│   ├── excel_processor.py                # Generació del fitxer Excel principal i del full Resum opcional
+│   ├── summary_generator.py              # Generació de resums per CLI
+│   └── data/
+│       └── mp_code_names.json            # Catàleg intern de codis MP i noms amigables per al full Resum
 ├── scripts/
 │   ├── cleanup_failed_uploads.py         # Neteja automàtica de fallades conservades
 │   ├── run-local-web.sh.example          # Plantilla d'arrencada local
@@ -228,6 +240,7 @@ Política de retenció:
 
 - es rep el fitxer
 - es converteix a un únic Excel
+- si l'usuari ho marca al formulari, el `.xlsx` inclou també un full `Resum`
 - l'usuari descarrega el `.xlsx`
 - el fitxer pujat i el directori temporal s'eliminen després
 
