@@ -3,6 +3,10 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
+import pandas as pd
+
+from src.grade_processor import sort_records
+
 from src.conversion_service import ConversionArtifact, build_zip_from_artifacts, cleanup_path, extract_zip_to_temp
 
 
@@ -54,3 +58,31 @@ def test_cleanup_path_removes_files_and_directories(tmp_path: Path) -> None:
 
     assert not file_path.exists()
     assert not dir_path.exists()
+
+
+def test_pivot_preserves_sorted_student_order_for_accents_and_enye() -> None:
+    records = pd.DataFrame(
+        [
+            {"estudiant": "Carvajal", "code": "MP01", "grade": 7},
+            {"estudiant": "Cañete", "code": "MP01", "grade": 6},
+            {"estudiant": "Cáceres", "code": "MP01", "grade": 5},
+            {"estudiant": "Domínguez", "code": "MP01", "grade": 4},
+            {"estudiant": "Díaz", "code": "MP01", "grade": 3},
+            {"estudiant": "Duporte", "code": "MP01", "grade": 2},
+        ]
+    )
+
+    sorted_records = sort_records(records)
+    student_order = sorted_records["estudiant"].drop_duplicates()
+    wide = sorted_records.pivot(index="estudiant", columns="code", values="grade")
+    wide = wide.reindex(student_order).reset_index()
+
+    assert wide["estudiant"].tolist() == [
+        "Cáceres",
+        "Cañete",
+        "Carvajal",
+        "Díaz",
+        "Domínguez",
+        "Duporte",
+    ]
+

@@ -68,3 +68,25 @@ def test_sort_records_normalizes_wrapped_names_and_sorts_case_insensitively() ->
 
     assert sorted_records["estudiant"].tolist() == ["Alice Example", "bob example", "bob example"]
     assert sorted_records["code"].tolist() == ["MP01", "MP01", "mp02"]
+
+def test_sort_records_handles_accents_and_enye_in_spanish_order() -> None:
+    records = pd.DataFrame(
+        [
+            {"estudiant": "Carvajal", "code": "MP01", "grade": 7},
+            {"estudiant": "Cañete", "code": "MP01", "grade": 6},
+            {"estudiant": "Cáceres", "code": "MP01", "grade": 5},
+            {"estudiant": "Domínguez", "code": "MP01", "grade": 4},
+            {"estudiant": "Díaz", "code": "MP01", "grade": 3},
+        ]
+    )
+
+    sorted_records = sort_records(records)
+
+    assert sorted_records["estudiant"].tolist() == [
+        "Cáceres",
+        "Cañete",
+        "Carvajal",
+        "Díaz",
+        "Domínguez",
+    ]
+

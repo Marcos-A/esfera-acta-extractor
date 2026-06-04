@@ -51,16 +51,31 @@ def forward_fill_names(
 
     Esfer@ tables often print the student name once and leave the following rows blank
     for related grades, so later grouping depends on copying the name downward.
+    Page breaks can also split a long student name across consecutive rows, leaving the
+    continued fragment in the name column but the leading identifier columns blank.
     """
     df = df.copy()
     name_col = next(
         col for col in df.columns if name_keyword.lower() in col.lower()
     )
-    df[name_col] = (
-        df[name_col]
-          .replace(r'^\s*$', np.nan, regex=True)
-          .ffill()
-    )
+    df[name_col] = df[name_col].replace(r'^\s*$', np.nan, regex=True)
+
+    leading_columns = list(df.columns[: df.columns.get_loc(name_col)])
+    for row_index in range(1, len(df)):
+        name_value = df.at[row_index, name_col]
+        if pd.isna(name_value):
+            continue
+        if any(str(df.at[row_index, col]).strip() for col in leading_columns if pd.notna(df.at[row_index, col])):
+            continue
+
+        previous_name = df.at[row_index - 1, name_col]
+        if pd.isna(previous_name):
+            continue
+
+        df.at[row_index - 1, name_col] = f"{str(previous_name).strip()} {str(name_value).strip()}".strip()
+        df.at[row_index, name_col] = np.nan
+
+    df[name_col] = df[name_col].ffill()
     return df, name_col
 
 

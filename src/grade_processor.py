@@ -3,6 +3,8 @@ Grade processing module for handling RA and EM records.
 """
 
 import re
+import unicodedata
+
 import pandas as pd
 
 
@@ -108,11 +110,28 @@ def sort_records(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean student names and sort records in a predictable order.
     """
+    def _student_sort_key(series: pd.Series) -> pd.Series:
+        """
+        Build a Spanish-friendly key that ignores accents but keeps n/ñ ordering.
+        """
+        normalized = (
+            series.fillna("")
+            .str.casefold()
+            .str.replace("ñ", "nz", regex=False)
+        )
+        return normalized.map(
+            lambda value: "".join(
+                char
+                for char in unicodedata.normalize("NFD", value)
+                if unicodedata.category(char) != "Mn"
+            )
+        )
+
     # Normalizing embedded line breaks here keeps later pivoting deterministic even if
     # the PDF extractor preserved the original wrapped text layout.
     df['estudiant'] = df['estudiant'].str.replace(r"\s*\n\s*", ' ', regex=True).str.strip()
     df = df.sort_values(
         by=['estudiant', 'code'],
-        key=lambda c: c.str.lower()
+        key=lambda c: _student_sort_key(c) if c.name == 'estudiant' else c.str.casefold()
     ).reset_index(drop=True)
-    return df 
+    return df

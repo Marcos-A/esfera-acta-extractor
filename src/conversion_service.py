@@ -131,10 +131,12 @@ def convert_pdf_to_excel(
         mp_codes = extract_mp_codes(ra_records)
         mp_codes_with_em = find_mp_codes_with_em(melted, mp_codes)
         combined_records = sort_records(combined_records)
+        student_order = combined_records["estudiant"].drop_duplicates()
 
         # The workbook layout expects one row per student and one column per code, so
         # pivot the long-form records back into a wide table at the end of parsing.
         wide = combined_records.pivot(index="estudiant", columns="code", values="grade")
+        wide = wide.reindex(student_order)
         for col in wide.columns:
             if col != "estudiant":
                 # Excel should receive numbers as numbers so conditional formatting works,
