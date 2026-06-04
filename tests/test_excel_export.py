@@ -20,12 +20,12 @@ def test_export_excel_with_spacing_creates_expected_public_safe_workbook(tmp_pat
     assert worksheet.freeze_panes == "C2"
     assert worksheet["A1"].value == "#"
     assert worksheet["B1"].value == "ESTUDIANT"
-    assert worksheet["C1"].value == "MP01_CF01_\nRA1"
-    assert worksheet["D1"].value == "MP01_CF01_\nRA2"
+    assert worksheet["C1"].value == "MP01_CF01_\n1RA"
+    assert worksheet["D1"].value == "MP01_CF01_\n2RA"
     assert worksheet["E1"].value == "MP01 CENTRE"
     assert worksheet["F1"].value == "MP01 EMPRESA"
     assert worksheet["G1"].value == "MP01"
-    assert worksheet["H1"].value == "MP02_CF02_\nRA1"
+    assert worksheet["H1"].value == "MP02_CF02_\n1RA"
     assert worksheet["I1"].value == "MP02"
 
     assert worksheet["A2"].value == 1
