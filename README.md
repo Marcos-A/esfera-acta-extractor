@@ -435,7 +435,7 @@ docker compose up -d --build
 El `docker-compose.yml` ja defineix `restart: unless-stopped`, un
 `healthcheck` contra `/health`, i un driver de logs `json-file` limitat a
 `max-size: 10m` / `max-file: 5`, per garantir que el contenidor es recupera
-sol després d'un reinici del host o d'un pengit del procés, i que els logs
+sol després d'un reinici del host o d'un penjat del procés, i que els logs
 no creixen sense límit.
 
 Bones pràctiques:
