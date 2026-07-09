@@ -410,34 +410,42 @@ The proxy should:
 - terminate TLS
 - forward `X-Forwarded-For`
 
-### Example production container run
+### Example production deployment
+
+The repository ships a `docker-compose.yml` for production:
 
 ```bash
-docker run -d \
-  --name esfera2excel-web \
-  -p 127.0.0.1:8000:8000 \
-  --log-opt max-size=10m \
-  --log-opt max-file=5 \
-  -e SECRET_KEY=change-this-secret \
-  -e ADMIN_USERNAME=admin \
-  -e ADMIN_PASSWORD=change-this-password \
-  -e TELEGRAM_BOT_TOKEN=... \
-  -e TELEGRAM_CHAT_ID=... \
-  -e FAILURE_RETENTION_DAYS=30 \
-  -e FAILURE_MAX_SIZE_MB=1024 \
-  -e AUDIT_DB_PATH=/app/data/conversion_audit.sqlite3 \
-  -e FAILURE_ROOT=/app/failed_uploads \
-  -v /persistent/path/data:/app/data \
-  -v /persistent/path/failed_uploads:/app/failed_uploads \
-  esfera2excel-web
+cp .env.local.example .env.prod
+# edit .env.prod with real secrets (SECRET_KEY, ADMIN_PASSWORD, etc.)
+
+docker compose up -d --build
 ```
+
+By default it publishes the service on `127.0.0.1:8088` and persists data to
+`/srv/data/esfera2excel/{data,failed_uploads}`. All of these can be
+overridden:
+
+```bash
+HOST_PORT=8000 \
+DATA_DIR=/persistent/path/data \
+FAILED_UPLOADS_DIR=/persistent/path/failed_uploads \
+ENV_FILE=/path/to/.env.prod \
+docker compose up -d --build
+```
+
+`docker-compose.yml` already declares `restart: unless-stopped`, a
+`healthcheck` against `/health`, and a `json-file` logging driver capped at
+`max-size: 10m` / `max-file: 5`, so the container recovers on its own after
+a host reboot or a hung process, and logs can't grow unbounded.
 
 Good practice:
 
 - do not bake secrets into the image
 - do not expose the app directly to the public internet if a reverse proxy is available
 - always change `SECRET_KEY` and `ADMIN_PASSWORD`
-- limit Docker logs with `--log-opt max-size` and `--log-opt max-file`
+- always deploy with `docker compose`, not a manual `docker run`: without a
+  declared restart policy the container will not come back after a host
+  reboot (this caused a real outage on 2026-07-08)
 
 ## Useful HTTP routes
 

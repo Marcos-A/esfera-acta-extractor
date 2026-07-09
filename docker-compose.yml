@@ -10,6 +10,11 @@ services:
       - ${DATA_DIR:-/srv/data/esfera2excel/data}:/app/data
       - ${FAILED_UPLOADS_DIR:-/srv/data/esfera2excel/failed_uploads}:/app/failed_uploads
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]
       interval: 30s

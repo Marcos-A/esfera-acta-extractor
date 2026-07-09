@@ -412,32 +412,41 @@ El proxy ha de:
 
 ### Comanda tipus de producció
 
+El repositori inclou un `docker-compose.yml` per a producció:
+
 ```bash
-docker run -d \
-  --name esfera2excel-web \
-  -p 127.0.0.1:8000:8000 \
-  --log-opt max-size=10m \
-  --log-opt max-file=5 \
-  -e SECRET_KEY=canvia-aquesta-clau \
-  -e ADMIN_USERNAME=admin \
-  -e ADMIN_PASSWORD=canvia-aquesta-contrasenya \
-  -e TELEGRAM_BOT_TOKEN=... \
-  -e TELEGRAM_CHAT_ID=... \
-  -e FAILURE_RETENTION_DAYS=30 \
-  -e FAILURE_MAX_SIZE_MB=1024 \
-  -e AUDIT_DB_PATH=/app/data/conversion_audit.sqlite3 \
-  -e FAILURE_ROOT=/app/failed_uploads \
-  -v /ruta/persistent/data:/app/data \
-  -v /ruta/persistent/failed_uploads:/app/failed_uploads \
-  esfera2excel-web
+cp .env.local.example .env.prod
+# edita .env.prod amb els secrets reals (SECRET_KEY, ADMIN_PASSWORD, etc.)
+
+docker compose up -d --build
 ```
+
+Per defecte publica el servei a `127.0.0.1:8088` i persisteix les dades a
+`/srv/data/esfera2excel/{data,failed_uploads}`. Es pot sobreescriure:
+
+```bash
+HOST_PORT=8000 \
+DATA_DIR=/ruta/persistent/data \
+FAILED_UPLOADS_DIR=/ruta/persistent/failed_uploads \
+ENV_FILE=/ruta/al/.env.prod \
+docker compose up -d --build
+```
+
+El `docker-compose.yml` ja defineix `restart: unless-stopped`, un
+`healthcheck` contra `/health`, i un driver de logs `json-file` limitat a
+`max-size: 10m` / `max-file: 5`, per garantir que el contenidor es recupera
+sol després d'un reinici del host o d'un pengit del procés, i que els logs
+no creixen sense límit.
 
 Bones pràctiques:
 
 - no incrustis secrets a la imatge
 - no exposis el port directament a internet si hi ha proxy invers
 - canvia sempre `SECRET_KEY` i `ADMIN_PASSWORD`
-- limita els logs de Docker amb `--log-opt max-size` i `--log-opt max-file`
+- desplega sempre amb `docker compose`, no amb `docker run` manual: sense una
+  política de reinici declarada, el contenidor no torna a arrencar sol
+  després d'un reinici del host (això va causar una caiguda real el
+  2026-07-08)
 
 ## Rutes HTTP útils
 
