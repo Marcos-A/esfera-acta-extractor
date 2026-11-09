@@ -1,5 +1,5 @@
 # Dockerfile
-FROM python:3.9-slim
+FROM python:3.12-slim
 
 # Install OS-level deps needed to build Pillow (pdfplumber's imaging backend),
 # plus general build tools for any Python C extensions

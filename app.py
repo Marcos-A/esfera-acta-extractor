@@ -40,6 +40,7 @@ from src.conversion_service import (
     convert_pdf_to_excel,
     extract_zip_to_temp,
 )
+from src.login_throttle import LoginThrottle
 from src.notifier import notify_failure
 
 
@@ -61,6 +62,7 @@ def create_app() -> Flask:
     Path(app.config["UPLOAD_ROOT"]).mkdir(parents=True, exist_ok=True)
     Path(app.config["FAILURE_ROOT"]).mkdir(parents=True, exist_ok=True)
     app.audit_store = AuditStore(app.config["AUDIT_DB_PATH"])
+    app.login_throttle = LoginThrottle()
     app.config["PUBLIC_ERROR_MESSAGE"] = (
         "Ep! No hem pogut convertir aquest fitxer. Hi ha hagut un problema durant el procés. "
         "Pot ser un error temporal nostre o bé que el fitxer pujat no sigui una acta d'Esfer@. "
@@ -96,12 +98,18 @@ def create_app() -> Flask:
         """Authenticate the lightweight built-in admin area."""
         error = None
         if request.method == "POST":
+            # Caddy sets X-Real-IP and replaces any value the client sends.
+            client = request.headers.get("X-Real-IP") or request.remote_addr or "unknown"
+            if app.login_throttle.blocked(client):
+                return render_template("admin_login.html", error="Too many attempts. Try again in a few minutes."), 429
             username = request.form.get("username", "")
             password = request.form.get("password", "")
             if _valid_admin_credentials(app, username, password):
+                app.login_throttle.reset(client)
                 session["admin_authenticated"] = True
                 session["admin_username"] = username
                 return redirect(url_for("admin_dashboard"))
+            app.login_throttle.record_failure(client)
             error = "Invalid credentials."
         return render_template("admin_login.html", error=error)
 

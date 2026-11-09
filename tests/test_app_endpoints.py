@@ -137,3 +137,13 @@ def test_convert_passes_summary_sheet_flag_to_converter(app_instance, client, mo
 
     assert response.status_code == 202
     assert called['include_summary_sheet'] is True
+
+
+def test_admin_login_is_throttled_after_repeated_failures(client):
+    for _ in range(10):
+        response = client.post("/admin/login", data={"username": "admin", "password": "wrong"})
+        assert response.status_code == 200
+
+    blocked = client.post("/admin/login", data={"username": "admin", "password": "s3cret"})
+
+    assert blocked.status_code == 429

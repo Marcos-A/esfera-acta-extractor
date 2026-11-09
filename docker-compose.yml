@@ -2,6 +2,8 @@ services:
   web:
     build: .
     container_name: esfera2excel-web
+    # Owns /srv/data/esfera2excel on the host.
+    user: "10001:10001"
     env_file:
       - ${ENV_FILE:-.env.prod}
     ports:
