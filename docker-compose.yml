@@ -10,6 +10,9 @@ services:
       - ${DATA_DIR:-/srv/data/esfera2excel/data}:/app/data
       - ${FAILED_UPLOADS_DIR:-/srv/data/esfera2excel/failed_uploads}:/app/failed_uploads
     restart: unless-stopped
+    # Public and anonymous: a hostile upload must not be able to starve the rest of the host.
+    mem_limit: 2g
+    pids_limit: 256
     logging:
       driver: json-file
       options:
